@@ -1,3 +1,6 @@
+-- TPS: Ultimate Soccer
+-- By histo
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -17,70 +20,61 @@ local Window = Rayfield:CreateWindow({
 })
 
 local Tab1 = Window:CreateTab("bronze pack inf", 4483362458)
+local Tab2 = Window:CreateTab("infinite stamina farm", 4483362458)
 
-local BronzePackEnabled = false
-local BronzePackConnection
+local BronzePackSpamming = false
+local InfiniteStaminaSpamming = false
+local SpamInterval = 0.3 -- Delay between script executions (in seconds)
 
 local Toggle1 = Tab1:CreateToggle({
     Name = "Enable Bronze Pack Spam",
     CurrentValue = false,
     Flag = "BronzePackToggle",
     Callback = function(state)
-        BronzePackEnabled = state
-
-        if BronzePackEnabled then
-            BronzePackConnection = game:GetService("RunService").RenderStepped:Connect(function()
-                local args = {
-                    [1] = 1,
-                    [2] = 665904602,
-                    [3] = "No.8",
-                    [4] = "Lvl.312",
-                    [5] = "88",
-                    [6] = "99",
-                    [7] = "83",
-                    [8] = "72",
-                    [9] = "80",
-                    [10] = "95",
-                    [11] = "99",
-                    [12] = 0
-                }
-                workspace.FE.PlayerCard.SaveOPCard:FireServer(unpack(args))  -- Spam bronze pack
-            end)
-        else
-            if BronzePackConnection then
-                BronzePackConnection:Disconnect()
-                BronzePackConnection = nil
-            end
+        BronzePackSpamming = state
+        if state then
+            coroutine.wrap(function()
+                while BronzePackSpamming do
+                    local args = {
+                        [1] = 1,
+                        [2] = 665904602,
+                        [3] = "No.8",
+                        [4] = "Lvl.312",
+                        [5] = "88",
+                        [6] = "99",
+                        [7] = "83",
+                        [8] = "72",
+                        [9] = "80",
+                        [10] = "95",
+                        [11] = "99",
+                        [12] = 0
+                    }
+                    workspace.FE.PlayerCard.SaveOPCard:FireServer(unpack(args))
+                    task.wait(SpamInterval) -- Add delay between executions
+                end
+            end)()
         end
     end,
 })
-
-local Tab2 = Window:CreateTab("infinite stamina farm", 4483362458)
-
-local InfiniteStaminaEnabled = false
-local InfiniteStaminaConnection
 
 local Toggle2 = Tab2:CreateToggle({
     Name = "Enable Infinite Stamina Farm",
     CurrentValue = false,
     Flag = "InfiniteStaminaToggle",
     Callback = function(state)
-        InfiniteStaminaEnabled = state
-
-        if InfiniteStaminaEnabled then
-            InfiniteStaminaConnection = game:GetService("RunService").RenderStepped:Connect(function()
-                local args = {
-                    [1] = 1840440993,
-                    [2] = "SkillG",
-                    [3] = false
-                }
-                workspace.FE.PlayerCard.Boost:FireServer(unpack(args))  -- Infinite Stamina Spam
-            end)
-        else
-            if InfiniteStaminaConnection then
-                InfiniteStaminaConnection:Disconnect()
-                InfiniteStaminaConnection = nil
-            end
+        InfiniteStaminaSpamming = state
+        if state then
+            coroutine.wrap(function()
+                while InfiniteStaminaSpamming do
+                    local args = {
+                        [1] = 1840440993,
+                        [2] = "SkillG",
+                        [3] = false
+                    }
+                    workspace.FE.PlayerCard.Boost:FireServer(unpack(args))
+                    task.wait(SpamInterval) -- Add delay between executions
+                end
+            end)()
         end
     end,
 })
