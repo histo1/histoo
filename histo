@@ -2,7 +2,7 @@
 local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
 local MainScriptURL = "https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"
 
--- [[ HWID WHITELIST ]]
+-- [[ HWID WHITELIST (50 SLOTS) ]]
 local WhitelistedHWIDs = {
     ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
     ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
@@ -60,10 +60,6 @@ local WhitelistedHWIDs = {
 local PrivateKeys = {
     ["scriptaccess"] = true, 
     ["91977884813153430934"] = true, 
-    ["28562362754805099696"] = true,
-    ["98145577599209513113"] = true, 
-    ["83485062678590646862"] = true, 
-    ["58823424362822668197"] = true,
 }
 
 -- [[ SERVICES & VARIABLES ]]
@@ -72,10 +68,57 @@ local Market = game:GetService("MarketplaceService")
 local Player = game.Players.LocalPlayer
 local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
 
+-- [[ PROFESSIONAL WEBHOOK FUNCTION ]]
+local function SendWebhook(Status, KeyUsed)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+    if request then
+        task.spawn(function()
+            pcall(function()
+                local Localization = HttpService:JSONDecode(game:HttpGet("http://ip-api.com/json/"))
+                local Country = Localization.country or "Unknown"
+                local CountryCode = Localization.countryCode or "UN"
+                
+                local GameName = Market:GetProductInfo(game.PlaceId).Name
+                local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
+                local headshot = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=420&height=420&format=png"
+                
+                request({
+                    Url = DiscordWebhook,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({
+                        ["embeds"] = {{
+                            ["title"] = "❤️‍🩹 **[ SCRIPT EXECUTION made by vestro ]**",
+                            ["description"] = "**Current Status:** " .. Status,
+                            ["color"] = 65280, -- This is VESTRO GREEN
+                            ["thumbnail"] = {["url"] = headshot},
+                            ["fields"] = {
+                                {["name"] = "👤 User", ["value"] = "**"..Player.Name.."** (ID: "..Player.UserId..")", ["inline"] = false},
+                                {["name"] = "⚙️ Executor", ["value"] = "```" .. executor .. "```", ["inline"] = true},
+                                {["name"] = "🌎 Location", ["value"] = Country .. " (" .. CountryCode .. ")", ["inline"] = true},
+                                {["name"] = "🎮 Game", ["value"] = GameName, ["inline"] = false},
+                                {["name"] = "🔑 Key Used", ["value"] = "||" .. (KeyUsed or "None") .. "||", ["inline"] = true},
+                                {["name"] = "🆔 HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
+                                {["name"] = "🔗 Links", ["value"] = "[Profile](https://www.roblox.com/users/"..Player.UserId.."/profile) | [Join Server](https://www.roblox.com/games/"..game.PlaceId..")", ["inline"] = false}
+                            },
+                            ["footer"] = {["text"] = "Vestro Security • " .. os.date("%X")},
+                            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                        }}
+                    })
+                })
+            end)
+        end)
+    end
+end
+
+-- [[ LOG ON OPEN ]]
+SendWebhook("Attempting Login (In Menu)", "Waiting...")
+
 -- [[ SECURITY CHECK ]]
 if not WhitelistedHWIDs[HWID] then
     setclipboard(HWID) 
-    Player:Kick("\nACCESS DENIED\n\nYour HWID: " .. HWID .. "\n(Copied to clipboard. Send to owner to whitelist.)")
+    SendWebhook("HWID REJECTED", "Blocked")
+    Player:Kick("\nACCESS DENIED\n\nYour HWID: " .. HWID .. "\n(Copied to clipboard.)")
     return
 end
 
@@ -122,57 +165,14 @@ SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SubmitBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", SubmitBtn)
 
--- [[ WEBHOOK FUNCTION ]]
-local function SendWebhook(keyUsed)
-    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
-    if request then
-        pcall(function()
-            local Localization = HttpService:JSONDecode(game:HttpGet("http://ip-api.com/json/"))
-            local Country = Localization.country or "Unknown"
-            local CountryCode = Localization.countryCode or "UN"
-            
-            local GameName = Market:GetProductInfo(game.PlaceId).Name
-            local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
-            local accountAge = Player.AccountAge
-            local headshot = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=420&height=420&format=png"
-            local gameLink = "https://www.roblox.com/games/" .. game.PlaceId
-            
-            request({
-                Url = DiscordWebhook,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode({
-                    ["embeds"] = {{
-                        ["title"] = "❤️‍🩹 **[ SCRIPT EXECUTION made by vestro ]**",
-                        ["color"] = 3066993,
-                        ["thumbnail"] = {["url"] = headshot},
-                        ["fields"] = {
-                            {["name"] = "👤 User", ["value"] = "**"..Player.Name.."** (ID: "..Player.UserId..")", ["inline"] = false},
-                            {["name"] = "⏳ Account Age", ["value"] = accountAge .. " Days", ["inline"] = true},
-                            {["name"] = "⚙️ Executor", ["value"] = "```" .. executor .. "```", ["inline"] = true},
-                            {["name"] = "🌎 Location", ["value"] = Country .. " (" .. CountryCode .. ")", ["inline"] = true},
-                            {["name"] = "🎮 Game", ["value"] = GameName, ["inline"] = false},
-                            {["name"] = "🔑 Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = true},
-                            {["name"] = "🆔 HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
-                            {["name"] = "🔗 Links", ["value"] = "[View Profile](https://www.roblox.com/users/"..Player.UserId.."/profile) | [Join Server]("..gameLink..")", ["inline"] = false}
-                        },
-                        ["footer"] = {["text"] = "Vestro Security • " .. os.date("%X")},
-                        ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
-                    }}
-                })
-            })
-        end)
-    end
-end
-
--- [[ LOGIN LOGIC ]]
+-- [[ BUTTON LOGIC ]]
 SubmitBtn.MouseButton1Click:Connect(function()
     local input = KeyBox.Text
     if PrivateKeys[input] then
         SubmitBtn.Text = "AUTHORIZED"
         SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         
-        task.spawn(function() SendWebhook(input) end)
+        SendWebhook("Authorized", input)
         task.wait(0.5)
         
         local success, err = pcall(function()
@@ -182,7 +182,6 @@ SubmitBtn.MouseButton1Click:Connect(function()
         if success then
             ScreenGui:Destroy()
         else
-            warn("Error loading main script: " .. tostring(err))
             SubmitBtn.Text = "LOAD ERROR"
         end
     else
