@@ -1,20 +1,15 @@
 -- [[ CONFIGURATION ]]
 local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
--- New Main Script URL updated below:
-local MainScriptURL = "loadstring(game:HttpGet("https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"))()"
+local MainScriptURL = "https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"
 
 -- [[ HWID WHITELIST ]]
+-- Paste new buyer HWIDs here. Don't forget the ["..."] = true, format!
 local WhitelistedHWIDs = {
-    ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
-    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
-    ["HWID_3_HERE"] = true,
-    ["HWID_4_HERE"] = true,
-    ["HWID_5_HERE"] = true,
-    ["HWID_6_HERE"] = true,
-    ["HWID_7_HERE"] = true,
-    ["HWID_8_HERE"] = true,
-    ["HWID_9_HERE"] = true,
-    ["HWID_10_HERE"] = true,
+    ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true, -- Owner 1
+    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true, -- Owner 2
+    ["PASTE_BUYER_HWID_HERE"] = true,
+    ["PASTE_BUYER_HWID_HERE"] = true,
+    ["PASTE_BUYER_HWID_HERE"] = true,
 }
 
 -- [[ KEY DATABASE ]]
@@ -27,14 +22,16 @@ local PrivateKeys = {
     ["58823424362822668197"] = true,
 }
 
-local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
-local Player = game.Players.LocalPlayer
+-- [[ SERVICES & VARIABLES ]]
+local HttpService = game:GetService("HttpService")
 local Market = game:GetService("MarketplaceService")
+local Player = game.Players.LocalPlayer
+local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
 
 -- [[ SECURITY CHECK ]]
 if not WhitelistedHWIDs[HWID] then
     setclipboard(HWID) 
-    Player:Kick("\nACCESS DENIED\nYour HWID: " .. HWID .. "\n(Copied to clipboard. Send to owner to whitelist.)")
+    Player:Kick("\nACCESS DENIED\n\nYour HWID: " .. HWID .. "\n(Copied to clipboard. Send to owner to whitelist.)")
     return
 end
 
@@ -46,7 +43,7 @@ local SubmitBtn = Instance.new("TextButton")
 local Title = Instance.new("TextLabel")
 
 ScreenGui.Parent = (game:GetService("CoreGui") or Player:WaitForChild("PlayerGui"))
-ScreenGui.Name = "SecureLoader"
+ScreenGui.Name = "VestroLoader"
 
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
@@ -57,7 +54,7 @@ MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 Title.Parent = MainFrame
-Title.Text = "WHITELISTED SYSTEM"
+Title.Text = "W1nd Buyer"
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
@@ -81,30 +78,36 @@ SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SubmitBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", SubmitBtn)
 
--- [[ WEBHOOK LOG ]]
+-- [[ PROFESSIONAL WEBHOOK FUNCTION ]]
 local function SendWebhook(keyUsed)
     local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
     if request then
         pcall(function()
             local GameName = Market:GetProductInfo(game.PlaceId).Name
-            local ExperienceLink = "https://www.roblox.com/games/" .. game.PlaceId
+            local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
+            local accountAge = Player.AccountAge
+            local headshot = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=420&height=420&format=png"
+            local gameLink = "https://www.roblox.com/games/" .. game.PlaceId
             
             request({
                 Url = DiscordWebhook,
                 Method = "POST",
                 Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode({
+                Body = HttpService:JSONEncode({
                     ["embeds"] = {{
-                        ["title"] = "🛡️ Authorized Login",
-                        ["color"] = 65280,
+                        ["title"] = "❤️‍🩹 **[ SCRIPT EXECUTION made by vestro ]**",
+                        ["color"] = 3066993, -- Greenish Blue
+                        ["thumbnail"] = {["url"] = headshot},
                         ["fields"] = {
-                            {["name"] = "Player", ["value"] = Player.Name, ["inline"] = true},
-                            {["name"] = "Game", ["value"] = GameName, ["inline"] = true},
-                            {["name"] = "Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = false},
-                            {["name"] = "Game Link", ["value"] = "[Click to View](" .. ExperienceLink .. ")", ["inline"] = true},
-                            {["name"] = "Server JobId", ["value"] = "```" .. game.JobId .. "```", ["inline"] = false},
-                            {["name"] = "HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false}
+                            {["name"] = "👤 User", ["value"] = Player.Name .. " (ID: " .. Player.UserId .. ")", ["inline"] = false},
+                            {["name"] = "⏳ Account Age", ["value"] = accountAge .. " Days", ["inline"] = true},
+                            {["name"] = "⚙️ Executor", ["value"] = "```" .. executor .. "```", ["inline"] = true},
+                            {["name"] = "🎮 Game", ["value"] = GameName, ["inline"] = false},
+                            {["name"] = "🔑 Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = true},
+                            {["name"] = "🆔 HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
+                            {["name"] = "🔗 Links", ["value"] = "[View Profile](https://www.roblox.com/users/"..Player.UserId.."/profile) | [Join Server]("..gameLink..")", ["inline"] = false}
                         },
+                        ["footer"] = {["text"] = "Vestro Security System"},
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }}
                 })
@@ -113,17 +116,17 @@ local function SendWebhook(keyUsed)
     end
 end
 
--- [[ BUTTON LOGIC ]]
+-- [[ LOGIN LOGIC ]]
 SubmitBtn.MouseButton1Click:Connect(function()
     local input = KeyBox.Text
     if PrivateKeys[input] then
         SubmitBtn.Text = "AUTHORIZED"
         SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         
+        -- Start Webhook and Load Script
         task.spawn(function() SendWebhook(input) end)
         task.wait(0.5)
         
-        -- Executes your new Pastefy script link
         local success, err = pcall(function()
             loadstring(game:HttpGet(MainScriptURL))()
         end)
@@ -131,7 +134,7 @@ SubmitBtn.MouseButton1Click:Connect(function()
         if success then
             ScreenGui:Destroy()
         else
-            warn("Script Load Error: " .. tostring(err))
+            warn("Error loading main script: " .. tostring(err))
             SubmitBtn.Text = "LOAD ERROR"
         end
     else
