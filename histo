@@ -1,82 +1,133 @@
--- TPS: Ultimate Soccer
--- By histo
+-- [[ CONFIGURATION ]]
+local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
+local MainScriptURL = "https://pandadevelopment.net/virtual/file/012b551ebc5c9cce"
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- [[ HWID WHITELIST ]]
+local WhitelistedHWIDs = {
+    ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
+    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
+    ["HWID_3_HERE"] = true,
+    ["HWID_4_HERE"] = true,
+    ["HWID_5_HERE"] = true,
+    ["HWID_6_HERE"] = true,
+    ["HWID_7_HERE"] = true,
+    ["HWID_8_HERE"] = true,
+    ["HWID_9_HERE"] = true,
+    ["HWID_10_HERE"] = true,
+}
 
-local Window = Rayfield:CreateWindow({
-    Name = "TPS: Ultimate Soccer",
-    LoadingTitle = "Rayfield UI",
-    LoadingSubtitle = "by Sirius",
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = nil,
-        FileName = "UltimateSoccerSettings"
-    },
-    Discord = {
-        Enabled = false,
-        Invite = "",
-    },
-    KeySystem = false
-})
+-- [[ KEY DATABASE ]]
+local PrivateKeys = {
+    ["scriptaccess"] = true, ["91977884813153430934"] = true, ["28562362754805099696"] = true,
+    ["98145577599209513113"] = true, ["83485062678590646862"] = true, ["58823424362822668197"] = true,
+}
 
-local Tab1 = Window:CreateTab("bronze pack inf", 4483362458)
-local Tab2 = Window:CreateTab("infinite stamina farm", 4483362458)
+-- [[ GET HARDWARE ID ]]
+local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
+local Player = game.Players.LocalPlayer
 
-local BronzePackSpamming = false
-local InfiniteStaminaSpamming = false
-local SpamInterval = 0.3 -- Delay between script executions (in seconds)
+-- [[ SECURITY CHECK ]]
+if not WhitelistedHWIDs[HWID] then
+    print("ACCESS DENIED. Your HWID is: " .. HWID) 
+    setclipboard(HWID) -- Automatically copies ID for them as requested earlier
+    Player:Kick("Unauthorized HWID. ID copied to clipboard: " .. HWID)
+    return
+end
 
-local Toggle1 = Tab1:CreateToggle({
-    Name = "Enable Bronze Pack Spam",
-    CurrentValue = false,
-    Flag = "BronzePackToggle",
-    Callback = function(state)
-        BronzePackSpamming = state
-        if state then
-            coroutine.wrap(function()
-                while BronzePackSpamming do
-                    local args = {
-                        [1] = 1,
-                        [2] = 665904602,
-                        [3] = "No.8",
-                        [4] = "Lvl.312",
-                        [5] = "88",
-                        [6] = "99",
-                        [7] = "83",
-                        [8] = "72",
-                        [9] = "80",
-                        [10] = "95",
-                        [11] = "99",
-                        [12] = 0
-                    }
-                    workspace.FE.PlayerCard.SaveOPCard:FireServer(unpack(args))
-                    task.wait(SpamInterval) -- Add delay between executions
-                end
-            end)()
+-- [[ UI SETUP ]]
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local KeyBox = Instance.new("TextBox")
+local SubmitBtn = Instance.new("TextButton")
+local Title = Instance.new("TextLabel")
+
+ScreenGui.Parent = (game:GetService("CoreGui") or Player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "SecureWhitelister"
+
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+MainFrame.Size = UDim2.new(0, 260, 0, 140)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -70)
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame)
+
+Title.Parent = MainFrame
+Title.Text = "WHITELISTED ACCESS"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.BackgroundTransparency = 1
+
+KeyBox.Parent = MainFrame
+KeyBox.Size = UDim2.new(0.85, 0, 0, 35)
+KeyBox.Position = UDim2.new(0.075, 0, 0.3, 0)
+KeyBox.PlaceholderText = "Enter License Key..."
+KeyBox.Text = ""
+KeyBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+KeyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", KeyBox)
+
+SubmitBtn.Parent = MainFrame
+SubmitBtn.Size = UDim2.new(0.85, 0, 0, 35)
+SubmitBtn.Position = UDim2.new(0.075, 0, 0.65, 0)
+SubmitBtn.Text = "LOG IN"
+SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubmitBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", SubmitBtn)
+
+-- [[ WEBHOOK LOG (IP Removed) ]]
+local function SendWebhook(keyUsed)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+    if request then
+        pcall(function()
+            request({
+                Url = DiscordWebhook,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode({
+                    ["embeds"] = {{
+                        ["title"] = "✅ Whitelist Login Success",
+                        ["color"] = 65280,
+                        ["fields"] = {
+                            {["name"] = "Player", ["value"] = Player.Name, ["inline"] = true},
+                            {["name"] = "HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
+                            {["name"] = "Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = false}
+                        }
+                    }}
+                })
+            })
+        end)
+    end
+end
+
+-- [[ LOGIN LOGIC ]]
+SubmitBtn.MouseButton1Click:Connect(function()
+    local input = KeyBox.Text
+    if PrivateKeys[input] then
+        SubmitBtn.Text = "AUTHORIZED"
+        SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        
+        task.spawn(function() SendWebhook(input) end)
+        task.wait(0.5)
+        
+        local success, err = pcall(function()
+            loadstring(game:HttpGet(MainScriptURL))()
+        end)
+        
+        if success then
+            ScreenGui:Destroy()
+        else
+            warn("Load Error: " .. tostring(err))
         end
-    end,
-})
+    else
+        SubmitBtn.Text = "INVALID KEY"
+        SubmitBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        task.wait(1)
+        SubmitBtn.Text = "LOG IN"
+        SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+    end
+end)
 
-local Toggle2 = Tab2:CreateToggle({
-    Name = "Enable Infinite Stamina Farm",
-    CurrentValue = false,
-    Flag = "InfiniteStaminaToggle",
-    Callback = function(state)
-        InfiniteStaminaSpamming = state
-        if state then
-            coroutine.wrap(function()
-                while InfiniteStaminaSpamming do
-                    local args = {
-                        [1] = 1840440993,
-                        [2] = "SkillG",
-                        [3] = false
-                    }
-                    workspace.FE.PlayerCard.Boost:FireServer(unpack(args))
-                    task.wait(SpamInterval) -- Add delay between executions
-                end
-            end)()
-        end
-    end,
-})
-
-Window:Init()
