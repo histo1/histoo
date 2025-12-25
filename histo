@@ -3,13 +3,24 @@ local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/Axg
 local MainScriptURL = "https://pandadevelopment.net/virtual/file/012b551ebc5c9cce"
 
 -- [[ HWID WHITELIST ]]
+-- Only these people can even open the UI.
 local WhitelistedHWIDs = {
     ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
+    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
+    ["HWID_3_HERE"] = true,
+    ["HWID_4_HERE"] = true,
+    ["HWID_5_HERE"] = true,
+    ["HWID_6_HERE"] = true,
+    ["HWID_7_HERE"] = true,
+    ["HWID_8_HERE"] = true,
+    ["HWID_9_HERE"] = true,
+    ["HWID_10_HERE"] = true,
 }
 
 -- [[ KEY DATABASE ]]
 local PrivateKeys = {
-    ["scriptaccess"] = true, ["91977884813153430934"] = true,
+    ["scriptaccess"] = true, ["91977884813153430934"] = true, ["28562362754805099696"] = true,
+    ["98145577599209513113"] = true, ["83485062678590646862"] = true, ["58823424362822668197"] = true,
 }
 
 local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
@@ -17,9 +28,10 @@ local Player = game.Players.LocalPlayer
 local Market = game:GetService("MarketplaceService")
 
 -- [[ SECURITY CHECK ]]
+-- This is the part that was "ruined" - it is now fully back.
 if not WhitelistedHWIDs[HWID] then
-    setclipboard(HWID)
-    Player:Kick("Unauthorized HWID. ID copied to clipboard: " .. HWID)
+    setclipboard(HWID) -- Automatically copies ID so they can send it to you
+    Player:Kick("\nACCESS DENIED\nYour HWID: " .. HWID .. "\n(Copied to clipboard. Send to owner to whitelist.)")
     return
 end
 
@@ -31,10 +43,10 @@ local SubmitBtn = Instance.new("TextButton")
 local Title = Instance.new("TextLabel")
 
 ScreenGui.Parent = (game:GetService("CoreGui") or Player:WaitForChild("PlayerGui"))
-ScreenGui.Name = "SecureWhitelister"
+ScreenGui.Name = "SecureLoader"
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.Size = UDim2.new(0, 260, 0, 140)
 MainFrame.Position = UDim2.new(0.5, -130, 0.5, -70)
 MainFrame.Active = true
@@ -42,7 +54,7 @@ MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
 
 Title.Parent = MainFrame
-Title.Text = "WHITELISTED ACCESS"
+Title.Text = "WHITELISTED SYSTEM"
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
@@ -52,31 +64,27 @@ Title.BackgroundTransparency = 1
 KeyBox.Parent = MainFrame
 KeyBox.Size = UDim2.new(0.85, 0, 0, 35)
 KeyBox.Position = UDim2.new(0.075, 0, 0.3, 0)
-KeyBox.PlaceholderText = "Enter License Key..."
-KeyBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+KeyBox.PlaceholderText = "Paste License Key..."
+KeyBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 KeyBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", KeyBox)
 
 SubmitBtn.Parent = MainFrame
 SubmitBtn.Size = UDim2.new(0.85, 0, 0, 35)
 SubmitBtn.Position = UDim2.new(0.075, 0, 0.65, 0)
-SubmitBtn.Text = "LOG IN"
+SubmitBtn.Text = "VERIFY"
 SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
 SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SubmitBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", SubmitBtn)
 
--- [[ WEBHOOK LOG (With Server Link) ]]
+-- [[ WEBHOOK LOG ]]
 local function SendWebhook(keyUsed)
     local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
     if request then
         pcall(function()
             local GameName = Market:GetProductInfo(game.PlaceId).Name
-            local PlaceId = game.PlaceId
-            local JobId = game.JobId
-            
-            -- Standard Roblox Experience Link
-            local ExperienceLink = "https://www.roblox.com/games/" .. PlaceId
+            local ExperienceLink = "https://www.roblox.com/games/" .. game.PlaceId
             
             request({
                 Url = DiscordWebhook,
@@ -84,17 +92,17 @@ local function SendWebhook(keyUsed)
                 Headers = {["Content-Type"] = "application/json"},
                 Body = game:GetService("HttpService"):JSONEncode({
                     ["embeds"] = {{
-                        ["title"] = "🚀 Script Executed",
+                        ["title"] = "🛡️ Authorized Login",
                         ["color"] = 65280,
                         ["fields"] = {
                             {["name"] = "Player", ["value"] = Player.Name, ["inline"] = true},
                             {["name"] = "Game", ["value"] = GameName, ["inline"] = true},
                             {["name"] = "Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = false},
-                            {["name"] = "Game Link", ["value"] = "[Click to View Experience](" .. ExperienceLink .. ")", ["inline"] = true},
-                            {["name"] = "Server JobId", ["value"] = "```" .. JobId .. "```", ["inline"] = false},
+                            {["name"] = "Game Link", ["value"] = "[Click to View](" .. ExperienceLink .. ")", ["inline"] = true},
+                            {["name"] = "Server JobId", ["value"] = "```" .. game.JobId .. "```", ["inline"] = false},
                             {["name"] = "HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false}
                         },
-                        ["footer"] = {["text"] = "To join this exact server, use the JobId in a join script."}
+                        ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }}
                 })
             })
@@ -102,7 +110,7 @@ local function SendWebhook(keyUsed)
     end
 end
 
--- [[ LOGIN LOGIC ]]
+-- [[ BUTTON LOGIC ]]
 SubmitBtn.MouseButton1Click:Connect(function()
     local input = KeyBox.Text
     if PrivateKeys[input] then
@@ -119,13 +127,13 @@ SubmitBtn.MouseButton1Click:Connect(function()
         if success then
             ScreenGui:Destroy()
         else
-            warn("Load Error: " .. tostring(err))
+            warn("Script Load Error: " .. tostring(err))
         end
     else
         SubmitBtn.Text = "INVALID KEY"
         SubmitBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         task.wait(1)
-        SubmitBtn.Text = "LOG IN"
+        SubmitBtn.Text = "VERIFY"
         SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
     end
 end)
