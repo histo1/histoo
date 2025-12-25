@@ -1,7 +1,7 @@
 -- [[ CONFIGURATION ]]
 local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
 -- New Main Script URL updated below:
-local MainScriptURL = "https://pastefy.app/pg8Phfy5/raw"
+local MainScriptURL = "loadstring(game:HttpGet("https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"))()"
 
 -- [[ HWID WHITELIST ]]
 local WhitelistedHWIDs = {
