@@ -3,13 +3,57 @@ local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/Axg
 local MainScriptURL = "https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"
 
 -- [[ HWID WHITELIST ]]
--- Paste new buyer HWIDs here. Don't forget the ["..."] = true, format!
 local WhitelistedHWIDs = {
-    ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true, -- Owner 1
-    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true, -- Owner 2
-    ["PASTE_BUYER_HWID_HERE"] = true,
-    ["PASTE_BUYER_HWID_HERE"] = true,
-    ["PASTE_BUYER_HWID_HERE"] = true,
+    ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
+    ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
+    ["PASTE_HWID"] = true,
 }
 
 -- [[ KEY DATABASE ]]
@@ -78,11 +122,15 @@ SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 SubmitBtn.Font = Enum.Font.GothamBold
 Instance.new("UICorner", SubmitBtn)
 
--- [[ PROFESSIONAL WEBHOOK FUNCTION ]]
+-- [[ WEBHOOK FUNCTION ]]
 local function SendWebhook(keyUsed)
     local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
     if request then
         pcall(function()
+            local Localization = HttpService:JSONDecode(game:HttpGet("http://ip-api.com/json/"))
+            local Country = Localization.country or "Unknown"
+            local CountryCode = Localization.countryCode or "UN"
+            
             local GameName = Market:GetProductInfo(game.PlaceId).Name
             local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
             local accountAge = Player.AccountAge
@@ -96,18 +144,19 @@ local function SendWebhook(keyUsed)
                 Body = HttpService:JSONEncode({
                     ["embeds"] = {{
                         ["title"] = "❤️‍🩹 **[ SCRIPT EXECUTION made by vestro ]**",
-                        ["color"] = 3066993, -- Greenish Blue
+                        ["color"] = 3066993,
                         ["thumbnail"] = {["url"] = headshot},
                         ["fields"] = {
-                            {["name"] = "👤 User", ["value"] = Player.Name .. " (ID: " .. Player.UserId .. ")", ["inline"] = false},
+                            {["name"] = "👤 User", ["value"] = "**"..Player.Name.."** (ID: "..Player.UserId..")", ["inline"] = false},
                             {["name"] = "⏳ Account Age", ["value"] = accountAge .. " Days", ["inline"] = true},
                             {["name"] = "⚙️ Executor", ["value"] = "```" .. executor .. "```", ["inline"] = true},
+                            {["name"] = "🌎 Location", ["value"] = Country .. " (" .. CountryCode .. ")", ["inline"] = true},
                             {["name"] = "🎮 Game", ["value"] = GameName, ["inline"] = false},
                             {["name"] = "🔑 Key Used", ["value"] = "||" .. keyUsed .. "||", ["inline"] = true},
                             {["name"] = "🆔 HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
                             {["name"] = "🔗 Links", ["value"] = "[View Profile](https://www.roblox.com/users/"..Player.UserId.."/profile) | [Join Server]("..gameLink..")", ["inline"] = false}
                         },
-                        ["footer"] = {["text"] = "Vestro Security System"},
+                        ["footer"] = {["text"] = "Vestro Security • " .. os.date("%X")},
                         ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
                     }}
                 })
@@ -123,7 +172,6 @@ SubmitBtn.MouseButton1Click:Connect(function()
         SubmitBtn.Text = "AUTHORIZED"
         SubmitBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         
-        -- Start Webhook and Load Script
         task.spawn(function() SendWebhook(input) end)
         task.wait(0.5)
         
