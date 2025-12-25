@@ -1,9 +1,9 @@
 -- [[ CONFIGURATION ]]
 local DiscordWebhook = "https://discord.com/api/webhooks/1453677798810980436/AxgxKuR-xeApUxs5DvpjCNVQu2bRGTQfM2_pIkprCbC4324husLv2KTXzFaMsh4fXInM"
-local MainScriptURL = "loadstring(game:HttpGet("https://pastefy.app/pg8Phfy5/raw"))()"
+-- New Main Script URL updated below:
+local MainScriptURL = "https://pastefy.app/pg8Phfy5/raw"
 
 -- [[ HWID WHITELIST ]]
--- Only these people can even open the UI.
 local WhitelistedHWIDs = {
     ["0a09631a-e8f8-4156-84d6-b955149081aa"] = true,
     ["2AFA93AC-BA11-4C6A-8877-2AA0754AFD63"] = true,
@@ -19,8 +19,12 @@ local WhitelistedHWIDs = {
 
 -- [[ KEY DATABASE ]]
 local PrivateKeys = {
-    ["scriptaccess"] = true, ["91977884813153430934"] = true, ["28562362754805099696"] = true,
-    ["98145577599209513113"] = true, ["83485062678590646862"] = true, ["58823424362822668197"] = true,
+    ["scriptaccess"] = true, 
+    ["91977884813153430934"] = true, 
+    ["28562362754805099696"] = true,
+    ["98145577599209513113"] = true, 
+    ["83485062678590646862"] = true, 
+    ["58823424362822668197"] = true,
 }
 
 local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
@@ -28,9 +32,8 @@ local Player = game.Players.LocalPlayer
 local Market = game:GetService("MarketplaceService")
 
 -- [[ SECURITY CHECK ]]
--- This is the part that was "ruined" - it is now fully back.
 if not WhitelistedHWIDs[HWID] then
-    setclipboard(HWID) -- Automatically copies ID so they can send it to you
+    setclipboard(HWID) 
     Player:Kick("\nACCESS DENIED\nYour HWID: " .. HWID .. "\n(Copied to clipboard. Send to owner to whitelist.)")
     return
 end
@@ -120,6 +123,7 @@ SubmitBtn.MouseButton1Click:Connect(function()
         task.spawn(function() SendWebhook(input) end)
         task.wait(0.5)
         
+        -- Executes your new Pastefy script link
         local success, err = pcall(function()
             loadstring(game:HttpGet(MainScriptURL))()
         end)
@@ -128,6 +132,7 @@ SubmitBtn.MouseButton1Click:Connect(function()
             ScreenGui:Destroy()
         else
             warn("Script Load Error: " .. tostring(err))
+            SubmitBtn.Text = "LOAD ERROR"
         end
     else
         SubmitBtn.Text = "INVALID KEY"
