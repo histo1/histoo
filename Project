@@ -9,5 +9,6 @@ if game.PlaceId == targetPlaceId then
 loadstring(game:HttpGet("https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"))()
     
 else
-    print("Wrong game. Script will not execute.")
+   
 end
+  -- this is the tha bronx btw
