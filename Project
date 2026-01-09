@@ -250,6 +250,8 @@ local function loadCobaltHub()
 
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        
+        -- Anti-cheat bypass
         if method == "FireServer" or method == "InvokeServer" then
             if tostring(self) == "CHECKER_1" or tostring(self) == "CHECKER" or tostring(self):find("AC") then
                 return wait(9e9)
@@ -298,6 +300,8 @@ local function loadCobaltHub()
     _G.JumpPower = 50
     _G.NoClip = false
     _G.InfiniteJump = false
+    _G.FlyEnabled = false
+    _G.FlySpeed = 50
 
     local Holding = false
     local ESP = {}
@@ -610,6 +614,27 @@ local function loadCobaltHub()
         end,
     }, "InfiniteJumpToggle")
 
+    sections.PlayerLeft:Header({ Name = "Fly" })
+
+    sections.PlayerLeft:Toggle({
+        Name = "Fly",
+        Default = false,
+        Callback = function(value)
+            _G.FlyEnabled = value
+        end,
+    }, "FlyToggle")
+
+    sections.PlayerLeft:Slider({
+        Name = "Fly Speed",
+        Default = 50,
+        Minimum = 10,
+        Maximum = 200,
+        Decimals = 0,
+        Callback = function(value)
+            _G.FlySpeed = value
+        end,
+    }, "FlySpeedSlider")
+
     sections.MiscLeft:Header({ Name = "Utilities" })
 
     sections.MiscLeft:Button({
@@ -906,13 +931,19 @@ local function loadCobaltHub()
         for _, v in next, Players:GetPlayers() do
             if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                 if not _G.TeamCheck or v.Team ~= LocalPlayer.Team then
-                    local ScreenPoint = Camera:WorldToScreenPoint(v.Character:WaitForChild("HumanoidRootPart", math.huge).Position)
-                    local mousePos = UserInput:GetMouseLocation()
-                    local VectorDistance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+                    local targetPart = v.Character:FindFirstChild(_G.AimPart) or v.Character:FindFirstChild("HumanoidRootPart")
+                    if targetPart then
+                        local ScreenPoint, OnScreen = Camera:WorldToScreenPoint(targetPart.Position)
+                        
+                        if OnScreen then
+                            local mousePos = UserInput:GetMouseLocation()
+                            local VectorDistance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
 
-                    if VectorDistance < MaximumDistance then
-                        MaximumDistance = VectorDistance
-                        Target = v
+                            if VectorDistance < MaximumDistance then
+                                MaximumDistance = VectorDistance
+                                Target = v
+                            end
+                        end
                     end
                 end
             end
@@ -934,11 +965,28 @@ local function loadCobaltHub()
                 })
             end
         end
+        
+        if input.KeyCode == _G.SilentAimKeybind then
+            if _G.SilentAimHoldMode then
+                SilentHolding = true
+            else
+                SilentHolding = not SilentHolding
+                Window:Notify({
+                    Title = "Silent Aim",
+                    Description = SilentHolding and "✓ ON" or "✗ OFF",
+                    Lifetime = 1
+                })
+            end
+        end
     end)
 
     UserInput.InputEnded:Connect(function(input)
         if input.KeyCode == _G.AimbotKeybind and _G.AimbotHoldMode then
             Holding = false
+        end
+        
+        if input.KeyCode == _G.SilentAimKeybind and _G.SilentAimHoldMode then
+            SilentHolding = false
         end
     end)
 
@@ -960,13 +1008,23 @@ local function loadCobaltHub()
             local target = GetClosestPlayer()
             
             if target and target.Character and target.Character:FindFirstChild(_G.AimPart) then
-                local aimPosition = target.Character[_G.AimPart].Position
-                local currentPos = Camera.CFrame.Position
-                local direction = (aimPosition - currentPos).Unit
-                local targetCFrame = CFrame.new(currentPos, currentPos + direction)
+                local targetPart = target.Character[_G.AimPart]
+                local screenPos, onScreen = Camera:WorldToScreenPoint(targetPart.Position)
                 
-                local smoothFactor = _G.Sensitivity * 2
-                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, smoothFactor)
+                -- Only lock if target is on screen and within FOV
+                if onScreen then
+                    local distance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                    
+                    if distance <= _G.CircleRadius then
+                        local aimPosition = targetPart.Position
+                        local currentPos = Camera.CFrame.Position
+                        local direction = (aimPosition - currentPos).Unit
+                        local targetCFrame = CFrame.new(currentPos, currentPos + direction)
+                        
+                        local smoothFactor = _G.Sensitivity * 2
+                        Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, smoothFactor)
+                    end
+                end
             end
         end
     end)
@@ -990,6 +1048,66 @@ local function loadCobaltHub()
                             part.CanCollide = false
                         end
                     end
+                end
+            end
+        end
+    end)
+
+    -- Fly System
+    local flyBodyGyro = nil
+    local flyBodyVelocity = nil
+
+    spawn(function()
+        while task.wait() do
+            if _G.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                
+                if not flyBodyGyro then
+                    flyBodyGyro = Instance.new("BodyGyro")
+                    flyBodyGyro.P = 9e4
+                    flyBodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+                    flyBodyGyro.cframe = hrp.CFrame
+                    flyBodyGyro.Parent = hrp
+                end
+                
+                if not flyBodyVelocity then
+                    flyBodyVelocity = Instance.new("BodyVelocity")
+                    flyBodyVelocity.velocity = Vector3.new(0, 0, 0)
+                    flyBodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+                    flyBodyVelocity.Parent = hrp
+                end
+                
+                local moveDirection = Vector3.new(0, 0, 0)
+                
+                if UserInput:IsKeyDown(Enum.KeyCode.W) then
+                    moveDirection = moveDirection + (Camera.CFrame.LookVector * _G.FlySpeed)
+                end
+                if UserInput:IsKeyDown(Enum.KeyCode.S) then
+                    moveDirection = moveDirection - (Camera.CFrame.LookVector * _G.FlySpeed)
+                end
+                if UserInput:IsKeyDown(Enum.KeyCode.A) then
+                    moveDirection = moveDirection - (Camera.CFrame.RightVector * _G.FlySpeed)
+                end
+                if UserInput:IsKeyDown(Enum.KeyCode.D) then
+                    moveDirection = moveDirection + (Camera.CFrame.RightVector * _G.FlySpeed)
+                end
+                if UserInput:IsKeyDown(Enum.KeyCode.Space) then
+                    moveDirection = moveDirection + Vector3.new(0, _G.FlySpeed, 0)
+                end
+                if UserInput:IsKeyDown(Enum.KeyCode.LeftShift) then
+                    moveDirection = moveDirection - Vector3.new(0, _G.FlySpeed, 0)
+                end
+                
+                flyBodyVelocity.velocity = moveDirection
+                flyBodyGyro.cframe = Camera.CFrame
+            else
+                if flyBodyGyro then
+                    flyBodyGyro:Destroy()
+                    flyBodyGyro = nil
+                end
+                if flyBodyVelocity then
+                    flyBodyVelocity:Destroy()
+                    flyBodyVelocity = nil
                 end
             end
         end
