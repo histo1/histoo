@@ -1,1 +1,13 @@
-print("hello")
+-- Define the target Place ID
+local targetPlaceId = 16472538603  -- Replace with your specific ID
+
+-- Check if the current game matches the ID
+if game.PlaceId == targetPlaceId then
+    print("Correct game detected! Executing script...")
+    
+    -- ima put the shi here 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"))()
+    
+else
+    print("Wrong game. Script will not execute.")
+end
