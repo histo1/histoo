@@ -1,0 +1,400 @@
+local player = game:GetService("Players").LocalPlayer
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Fluent
+local success, result = pcall(function()
+    local source = game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua", true)
+    Fluent = loadstring(source)()
+end)
+
+if not success then
+    success, result = pcall(function()
+        Fluent = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/Interface.lua"))()
+    end)
+end
+
+if not success or not Fluent then
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "CobaltHub"
+    ScreenGui.Parent = player:WaitForChild("PlayerGui")
+    
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 300, 0, 200)
+    Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Frame.Parent = ScreenGui
+    
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(1, 0, 1, 0)
+    TextLabel.Text = "Fluent UI failed to load\nUsing fallback UI"
+    TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    TextLabel.BackgroundTransparency = 1
+    TextLabel.Parent = Frame
+    
+    return
+end
+
+local Window = Fluent:CreateWindow({
+    Title = "Cobalt Hub - RFL",
+    SubTitle = "by rapidkuba",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "" }),
+    Ball = Window:AddTab({ Title = "Ball", Icon = "" }),
+    Game = Window:AddTab({ Title = "Game", Icon = "" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "" })
+}
+
+local config = {
+    infStamOn = false,
+    antiOutOn = false,
+    ballPredictOn = false,
+    autoGoal = false,
+    ballPredictColor = Color3.fromRGB(100, 180, 255)
+}
+
+local function getBalls()
+    local balls = {}
+    pcall(function()
+        if Workspace:FindFirstChild("game") then
+            for _, obj in ipairs(Workspace.game:GetDescendants()) do
+                if obj:IsA("BasePart") and (obj:GetAttribute("networkOwner") or obj:GetAttribute("lastTouch") or obj.Name:lower():find("ball")) then
+                    table.insert(balls, obj)
+                end
+            end
+        end
+    end)
+    return balls
+end
+
+Tabs.Main:AddToggle("InfStaminaToggle", {
+    Title = "Infinite Stamina",
+    Default = false,
+    Callback = function(val)
+        config.infStamOn = val
+    end
+})
+
+Tabs.Ball:AddToggle("BallPredictToggle", {
+    Title = "Ball Predictor",
+    Description = "shows ball trajectory",
+    Default = false,
+    Callback = function(val)
+        config.ballPredictOn = val
+        if val then
+            Fluent:Notify({
+                Title = "Ball Predictor",
+                Content = "Enabled",
+                Duration = 2
+            })
+        end
+    end
+})
+
+Tabs.Ball:AddToggle("AutoGoalToggle", {
+    Title = "Auto Goal",
+    Description = "automatically scores goals",
+    Default = false,
+    Callback = function(val)
+        config.autoGoal = val
+        Fluent:Notify({
+            Title = "Auto Goal",
+            Content = (val and "Enabled" or "Disabled"),
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Game:AddToggle("AntiOutToggle", {
+    Title = "Anti-Out",
+    Description = "prevents out of bounds",
+    Default = false,
+    Callback = function(val)
+        config.antiOutOn = val
+        Fluent:Notify({
+            Title = "Anti-Out",
+            Content = (val and "Enabled" or "Disabled"),
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Game:AddButton({
+    Title = "Match Settings",
+    Description = "open match settings",
+    Callback = function()
+        pcall(function()
+            local ps = player:WaitForChild("PlayerScripts")
+            if ps then
+                local visuals = ps:WaitForChild("visuals")
+                if visuals then
+                    local matchSettings = visuals:WaitForChild("matchSettings")
+                    if matchSettings then
+                        matchSettings:SetAttribute("toggle", true)
+                        Fluent:Notify({
+                            Title = "Match Settings",
+                            Content = "Toggled!",
+                            Duration = 2
+                        })
+                    end
+                end
+            end
+        end)
+    end
+})
+
+Tabs.Game:AddButton({
+    Title = "Pitch Teleport",
+    Description = "teleport to pitch",
+    Callback = function()
+        pcall(function()
+            local net = ReplicatedStorage:FindFirstChild("network")
+            if net then
+                local shared = net:FindFirstChild("Shared")
+                if shared then
+                    for _, re in pairs(shared:GetChildren()) do
+                        if re:IsA("RemoteEvent") then 
+                            re:FireServer("pitchTeleporter") 
+                            Fluent:Notify({
+                                Title = "Teleport",
+                                Content = "Teleported to pitch!",
+                                Duration = 2
+                            })
+                            break 
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Rejoin Server",
+    Description = "rejoins current server",
+    Callback = function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Server Hop",
+    Description = "joins a different server",
+    Callback = function()
+        pcall(function()
+            local servers = {}
+            local success, req = pcall(function()
+                return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+            end)
+            
+            if success and req then
+                local data = HttpService:JSONDecode(req)
+                if data and data.data then
+                    for _, srv in pairs(data.data) do
+                        if srv.id ~= game.JobId and srv.playing < srv.maxPlayers then
+                            table.insert(servers, srv.id)
+                        end
+                    end
+                end
+            end
+            
+            if #servers > 0 then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
+            else
+                Fluent:Notify({
+                    Title = "Server Hop",
+                    Content = "No available servers found",
+                    Duration = 3
+                })
+            end
+        end)
+    end
+})
+
+Tabs.Settings:AddParagraph({
+    Title = "Discord",
+    Content = "Join our discord server for updates and support"
+})
+
+Tabs.Settings:AddButton({
+    Title = "Copy Discord",
+    Description = "copies discord invite",
+    Callback = function()
+        if setclipboard then
+            setclipboard("https://discord.gg/4RR8WXwdAx")
+            Fluent:Notify({
+                Title = "Copied!",
+                Content = "Discord invite copied to clipboard",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Error",
+                Content = "Clipboard function not available",
+                Duration = 3
+            })
+        end
+    end
+})
+
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+player.CharacterAdded:Connect(function(c)
+    char = c
+    hrp = c:WaitForChild("HumanoidRootPart")
+end)
+
+local outstore = {}
+
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        if not char or not char.Parent then
+            char = player.Character or player.CharacterAdded:Wait()
+        end
+        if not char then return end
+        
+        if not hrp or not hrp.Parent then
+            hrp = char:WaitForChild("HumanoidRootPart")
+        end
+        if not hrp then return end
+        
+        if config.infStamOn then
+            pcall(function()
+                local ps = player:FindFirstChild("PlayerScripts")
+                if ps then
+                    local controllers = ps:FindFirstChild("controllers")
+                    if controllers then
+                        local movementController = controllers:FindFirstChild("movementController")
+                        if movementController then
+                            local stamina = movementController:FindFirstChild("stamina")
+                            if stamina then
+                                stamina.Value = 100
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        
+        if config.antiOutOn then
+            local out = Workspace:FindFirstChild("game") and Workspace.game:FindFirstChild("system") and Workspace.game.system:FindFirstChild("out")
+            if out then
+                for _, part in ipairs(out:GetChildren()) do
+                    if table.find({"AwayLeft","AwayRight","HomeLeft","HomeRight","ThrowInFarSide","ThrowInTunnelSide"}, part.Name) then
+                        if not outstore[part.Name] then
+                            outstore[part.Name] = part.Parent
+                            part.Parent = nil
+                        end
+                    end
+                end
+            end
+        else
+            for name, parent in pairs(outstore) do
+                local out = Workspace:FindFirstChild("game") and Workspace.game:FindFirstChild("system") and Workspace.game.system:FindFirstChild("out")
+                if out then
+                    local part = out:FindFirstChild(name)
+                    if part then 
+                        part.Parent = parent 
+                    end
+                end
+            end
+            outstore = {}
+        end
+        
+        if config.ballPredictOn then
+            local balls = getBalls()
+            if #balls > 0 then
+                for _, v in pairs(Workspace:GetChildren()) do
+                    if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then 
+                        v:Destroy() 
+                    end
+                end
+                
+                table.sort(balls, function(a, b)
+                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+                end)
+                
+                local ball = balls[1]
+                if ball and ball.AssemblyLinearVelocity and ball.AssemblyLinearVelocity.Magnitude >= 5 then
+                    local pos = ball.Position
+                    local vel = ball.AssemblyLinearVelocity
+                    local grav = Workspace.Gravity
+                    local ground = hrp.Position.Y - 2
+                    local points = {}
+                    
+                    for i = 1, 25 do
+                        local t = i * 0.1
+                        local futurePos = pos + (vel * t) + Vector3.new(0, -0.5 * grav * t * t, 0)
+                        if futurePos.Y <= ground then
+                            table.insert(points, Vector3.new(futurePos.X, ground, futurePos.Z))
+                            break
+                        else
+                            table.insert(points, futurePos)
+                        end
+                    end
+                    
+                    if #points >= 2 then
+                        for i = 1, #points - 1 do
+                            local att0 = Instance.new("Attachment")
+                            att0.Name = "CobaltPredAttach"
+                            att0.WorldPosition = points[i]
+                            att0.Parent = Workspace.Terrain
+                            
+                            local att1 = Instance.new("Attachment")
+                            att1.Name = "CobaltPredAttach"
+                            att1.WorldPosition = points[i + 1]
+                            att1.Parent = Workspace.Terrain
+                            
+                            local beam = Instance.new("Beam")
+                            beam.Name = "CobaltPred"
+                            beam.Attachment0 = att0
+                            beam.Attachment1 = att1
+                            beam.Color = ColorSequence.new(config.ballPredictColor)
+                            beam.Width0 = 0.3
+                            beam.Width1 = 0.3
+                            beam.FaceCamera = true
+                            beam.Transparency = NumberSequence.new(0.3)
+                            beam.Parent = Workspace
+                        end
+                        
+                        task.delay(2, function()
+                            for _, v in pairs(Workspace:GetChildren()) do
+                                if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then 
+                                    v:Destroy() 
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        else
+            for _, v in pairs(Workspace:GetChildren()) do
+                if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then 
+                    v:Destroy() 
+                end
+            end
+        end
+    end)
+end)
+
+task.wait(1)
+Fluent:Notify({
+    Title = "✓ Cobalt Hub RFL",
+    Content = "Successfully loaded!\nPress RightControl to toggle",
+    Duration = 5
+})
+
+print("Cobalt Hub RFL loaded successfully!")
+print("Press RightControl to toggle UI")
