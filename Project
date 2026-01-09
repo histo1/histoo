@@ -892,4 +892,130 @@ local function loadCobaltHub()
             if ESP[player].HealthText then ESP[player].HealthText:Remove() end
             if ESP[player].HealthBar then
                 if ESP[player].HealthBar.Background then ESP[player].HealthBar.Background:Remove() end
-                if ESP[player].HealthBar.Bar then ESP[player].HealthBar.Bar:Re
+                if ESP[player].HealthBar.Bar then ESP[player].HealthBar.Bar:Remove() end
+            end
+            if ESP[player].Tracer then ESP[player].Tracer:Remove() end
+            ESP[player] = nil
+        end
+    end)
+
+    local function GetClosestPlayer()
+        local MaximumDistance = _G.CircleRadius
+        local Target = nil
+
+        for _, v in next, Players:GetPlayers() do
+            if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                if not _G.TeamCheck or v.Team ~= LocalPlayer.Team then
+                    local ScreenPoint = Camera:WorldToScreenPoint(v.Character:WaitForChild("HumanoidRootPart", math.huge).Position)
+                    local mousePos = UserInput:GetMouseLocation()
+                    local VectorDistance = (Vector2.new(mousePos.X, mousePos.Y) - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+
+                    if VectorDistance < MaximumDistance then
+                        MaximumDistance = VectorDistance
+                        Target = v
+                    end
+                end
+            end
+        end
+
+        return Target
+    end
+
+    UserInput.InputBegan:Connect(function(input)
+        if input.KeyCode == _G.AimbotKeybind then
+            if _G.AimbotHoldMode then
+                Holding = true
+            else
+                Holding = not Holding
+                Window:Notify({
+                    Title = "Aimbot",
+                    Description = Holding and "✓ ON" or "✗ OFF",
+                    Lifetime = 1
+                })
+            end
+        end
+    end)
+
+    UserInput.InputEnded:Connect(function(input)
+        if input.KeyCode == _G.AimbotKeybind and _G.AimbotHoldMode then
+            Holding = false
+        end
+    end)
+
+    local lastTarget = nil
+    local lockDelay = 0
+
+    RunService.RenderStepped:Connect(function(dt)
+        local mousePos = UserInput:GetMouseLocation()
+        FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+        FOVCircle.Radius = _G.CircleRadius
+        FOVCircle.Filled = _G.CircleFilled
+        FOVCircle.Color = _G.CircleColor
+        FOVCircle.Visible = _G.CircleVisible
+        FOVCircle.Transparency = _G.CircleTransparency
+        FOVCircle.NumSides = _G.CircleSides
+        FOVCircle.Thickness = _G.CircleThickness
+
+        if Holding and _G.AimbotEnabled then
+            local target = GetClosestPlayer()
+            
+            if target and target.Character and target.Character:FindFirstChild(_G.AimPart) then
+                local aimPosition = target.Character[_G.AimPart].Position
+                local currentPos = Camera.CFrame.Position
+                local direction = (aimPosition - currentPos).Unit
+                local targetCFrame = CFrame.new(currentPos, currentPos + direction)
+                
+                local smoothFactor = _G.Sensitivity * 2
+                Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, smoothFactor)
+            end
+        end
+    end)
+
+    spawn(function()
+        while task.wait() do
+            if LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    if _G.WalkSpeed > 16 then
+                        humanoid.WalkSpeed = _G.WalkSpeed
+                    end
+                    if _G.JumpPower > 50 then
+                        humanoid.JumpPower = _G.JumpPower
+                    end
+                end
+                
+                if _G.NoClip then
+                    for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    UserInput.JumpRequest:Connect(function()
+        if _G.InfiniteJump and LocalPlayer.Character then
+            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end)
+    
+    notify("✓ Loaded", "Cobalt Hub loaded!", 3)
+end
+
+if currentPlaceId == GAMES.TouchFootball then
+    loadTouchFootball()
+elseif currentPlaceId == GAMES.Arsenal or currentPlaceId == GAMES.Counterblox then
+    loadCobaltHub()
+else
+    notify("Unsupported Game", "This game is not supported!\nPlaceID: " .. tostring(currentPlaceId), 10)
+    warn("Unsupported game detected. Current PlaceId:", currentPlaceId)
+    warn("Supported games:")
+    for name, id in pairs(GAMES) do
+        warn(string.format("  - %s: %d", name, id))
+    end
+end
