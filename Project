@@ -1,14 +1,895 @@
--- Define the target Place ID
-local targetPlaceId = 16472538603  -- Replace with your specific ID
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 
--- Check if the current game matches the ID
-if game.PlaceId == targetPlaceId then
-    print("Correct game detected! Executing script...")
-    
-    -- ima put the shi here 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/histo1/Safe/refs/heads/main/Yh"))()
-    
-else
-   
+local GAMES = {
+    TouchFootball = 16447934574,
+    Arsenal = 286090429,
+    Counterblox = 301549746
+}
+
+local currentPlaceId = game.PlaceId
+
+local function notify(title, message, duration)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title;
+        Text = message;
+        Duration = duration or 5;
+    })
 end
-  -- this is the tha bronx btw
+
+notify("Game Detector", "Detecting game...", 3)
+
+wait(1)
+
+local function loadTouchFootball()
+    notify("Game Detected", "Touch Football - Loading script...", 3)
+    wait(0.5)
+    
+    local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+    local Window = Fluent:CreateWindow({
+        Title = "Touch Football",
+        SubTitle = "by rapidkuba",
+        TabWidth = 160,
+        Size = UDim2.fromOffset(580, 460),
+        Acrylic = true,
+        Theme = "Dark"
+    })
+
+    local Tabs = {
+        Main = Window:AddTab({ Title = "Main", Icon = "" }),
+        Player = Window:AddTab({ Title = "Player", Icon = "" }),
+        Misc = Window:AddTab({ Title = "Misc", Icon = "" })
+    }
+
+    local loopBring = false
+
+    Tabs.Main:AddButton({
+        Title = "Bring Ball",
+        Description = "brings ball to your position",
+        Callback = function()
+            local ball = workspace.FootballField:FindFirstChild("SoccerBall")
+            local char = game.Players.LocalPlayer.Character
+            
+            if ball and char and char:FindFirstChild("HumanoidRootPart") then
+                ball.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+            end
+        end
+    })
+
+    Tabs.Main:AddToggle("LoopBring", {
+        Title = "Loop Bring Ball",
+        Default = false,
+        Callback = function(val)
+            loopBring = val
+            
+            while loopBring do
+                task.wait(0.5) -- Optimalizováno z 0.1 na 0.5
+                
+                local ball = workspace.FootballField:FindFirstChild("SoccerBall")
+                local char = game.Players.LocalPlayer.Character
+                
+                if ball and char and char:FindFirstChild("HumanoidRootPart") then
+                    ball.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                end
+            end
+        end
+    })
+
+    Tabs.Main:AddButton({
+        Title = "Score for Team A",
+        Description = "scores a goal for team A",
+        Callback = function()
+            game:GetService("ReplicatedStorage").KickBall:FireServer(
+                Vector3.new(-213.6, 6.2, 117.2),
+                Vector3.new(84.7, 34, 6.9),
+                Vector3.new(0, -3.3, 0),
+                3.37,
+                "djhtelkds"
+            )
+            
+            task.wait(0.5)
+            game:GetService("ReplicatedStorage").GoalEvent:FireServer("A")
+        end
+    })
+
+    Tabs.Main:AddButton({
+        Title = "Score for Team B",
+        Description = "scores a goal for team B",
+        Callback = function()
+            game:GetService("ReplicatedStorage").KickBall:FireServer(
+                Vector3.new(-213.6, 6.2, 117.2),
+                Vector3.new(84.7, 34, 6.9),
+                Vector3.new(0, -3.3, 0),
+                3.37,
+                "djhtelkds"
+            )
+            
+            task.wait(0.5)
+            game:GetService("ReplicatedStorage").GoalEvent:FireServer("B")
+        end
+    })
+
+    local walkSpeedEnabled = false
+    local currentWalkSpeed = 16
+
+    Tabs.Player:AddSlider("WalkSpeed", {
+        Title = "Walk Speed",
+        Description = "change your walk speed",
+        Default = 16,
+        Min = 16,
+        Max = 200,
+        Rounding = 0,
+        Callback = function(val)
+            currentWalkSpeed = val
+            walkSpeedEnabled = val > 16
+        end
+    })
+
+    -- Optimalizovaný loop pro walk speed s Heartbeat
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if walkSpeedEnabled then
+            local char = game.Players.LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                if char.Humanoid.WalkSpeed ~= currentWalkSpeed then
+                    char.Humanoid.WalkSpeed = currentWalkSpeed
+                end
+            end
+        end
+    end)
+
+    game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+        char:WaitForChild("Humanoid")
+        task.wait(0.5)
+        if walkSpeedEnabled then
+            char.Humanoid.WalkSpeed = currentWalkSpeed
+        end
+        
+        local ball = workspace.FootballField:FindFirstChild("SoccerBall")
+        if ball then
+            for _, part in pairs(ball:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end)
+
+    Tabs.Misc:AddToggle("AntiAFK", {
+        Title = "Anti-AFK",
+        Default = false,
+        Callback = function(val)
+            if val then
+                local vu = game:GetService("VirtualUser")
+                game:GetService("Players").LocalPlayer.Idled:Connect(function()
+                    vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                    task.wait(1)
+                    vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                end)
+            end
+        end
+    })
+
+    Tabs.Misc:AddButton({
+        Title = "Rejoin Server",
+        Description = "rejoins current server",
+        Callback = function()
+            game:GetService("TeleportService"):Teleport(game.PlaceId, game.Players.LocalPlayer)
+        end
+    })
+
+    Tabs.Misc:AddButton({
+        Title = "Server Hop",
+        Description = "joins a different server",
+        Callback = function()
+            local servers = {}
+            local req = game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+            local body = game:GetService("HttpService"):JSONDecode(req)
+            
+            for i, v in pairs(body.data) do
+                if v.id ~= game.JobId and v.playing < v.maxPlayers then
+                    table.insert(servers, v.id)
+                end
+            end
+            
+            if #servers > 0 then
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)])
+            end
+        end
+    })
+
+    Tabs.Misc:AddParagraph({
+        Title = "Discord",
+        Content = "Join our discord server for updates and support"
+    })
+
+    Tabs.Misc:AddButton({
+        Title = "Copy Discord",
+        Description = "copies discord invite",
+        Callback = function()
+            setclipboard("https://discord.gg/4RR8WXwdAx")
+            Fluent:Notify({
+                Title = "Copied!",
+                Content = "Discord invite copied to clipboard",
+                Duration = 3
+            })
+        end
+    })
+    
+    notify("✓ Loaded", "Touch Football script loaded!", 3)
+end
+
+local function loadCobaltHub()
+    notify("Game Detected", "Arsenal/Counterblox - Loading Cobalt Hub...", 3)
+    wait(0.5)
+    
+    local MacLib = loadstring(game:HttpGet("https://github.com/biggaboy212/Maclib/releases/latest/download/maclib.txt"))()
+
+    local Window = MacLib:Window({
+        Title = "Cobalt Hub",
+        Subtitle = "by rapidkuba",
+        Size = UDim2.fromOffset(868, 650),
+        DragStyle = 1,
+        DisabledWindowControls = {},
+        ShowUserInfo = true,
+        Keybind = Enum.KeyCode.RightShift,
+        AcrylicBlur = true,
+    })
+
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local Camera = workspace.CurrentCamera
+    local RunService = game:GetService("RunService")
+    local UserInput = game:GetService("UserInputService")
+    local Tween = game:GetService("TweenService")
+
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    local oldIndex = mt.__index
+    setreadonly(mt, false)
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "FireServer" or method == "InvokeServer" then
+            if tostring(self) == "CHECKER_1" or tostring(self) == "CHECKER" or tostring(self):find("AC") then
+                return wait(9e9)
+            end
+        end
+        if method == "Kick" then
+            return wait(9e9)
+        end
+        return oldNamecall(self, ...)
+    end)
+
+    mt.__index = newcclosure(function(self, key)
+        if key == "Character" and checkcaller() then
+            return oldIndex(self, key)
+        end
+        return oldIndex(self, key)
+    end)
+
+    setreadonly(mt, true)
+
+    _G.Skeleton = false
+    _G.Box = false
+    _G.Distance = false
+    _G.ShowName = false
+    _G.ShowHealthText = false
+    _G.ShowTracer = false
+    _G.Color = Color3.fromRGB(255, 128, 0)
+    _G.TeamCheck = false
+    _G.RefreshRate = 0.03
+
+    _G.AimbotEnabled = false
+    _G.AimbotHoldMode = false
+    _G.AimbotKeybind = Enum.KeyCode.E
+    _G.AimPart = "Head"
+    _G.Sensitivity = 0.5
+
+    _G.CircleSides = 64
+    _G.CircleColor = Color3.fromRGB(255, 255, 255)
+    _G.CircleTransparency = 0.7
+    _G.CircleRadius = 80
+    _G.CircleFilled = false
+    _G.CircleVisible = false
+    _G.CircleThickness = 0
+
+    _G.WalkSpeed = 16
+    _G.JumpPower = 50
+    _G.NoClip = false
+    _G.InfiniteJump = false
+
+    local Holding = false
+    local ESP = {}
+    local currentTween = nil
+
+    local FOVCircle = Drawing.new("Circle")
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Radius = _G.CircleRadius
+    FOVCircle.Filled = _G.CircleFilled
+    FOVCircle.Color = _G.CircleColor
+    FOVCircle.Visible = _G.CircleVisible
+    FOVCircle.Transparency = _G.CircleTransparency
+    FOVCircle.NumSides = _G.CircleSides
+    FOVCircle.Thickness = _G.CircleThickness
+
+    local globalSettings = {
+        UIBlurToggle = Window:GlobalSetting({
+            Name = "UI Blur",
+            Default = Window:GetAcrylicBlurState(),
+            Callback = function(bool)
+                Window:SetAcrylicBlurState(bool)
+            end,
+        }),
+        NotificationToggler = Window:GlobalSetting({
+            Name = "Notifications",
+            Default = Window:GetNotificationsState(),
+            Callback = function(bool)
+                Window:SetNotificationsState(bool)
+            end,
+        }),
+        ShowUserInfo = Window:GlobalSetting({
+            Name = "Show User Info",
+            Default = Window:GetUserInfoState(),
+            Callback = function(bool)
+                Window:SetUserInfoState(bool)
+            end,
+        })
+    }
+
+    local tabGroups = {
+        TabGroup1 = Window:TabGroup()
+    }
+
+    local tabs = {
+        Combat = tabGroups.TabGroup1:Tab({ Name = "Combat", Image = "rbxassetid://18821914323" }),
+        Visuals = tabGroups.TabGroup1:Tab({ Name = "Visuals", Image = "rbxassetid://10734950309" }),
+        Player = tabGroups.TabGroup1:Tab({ Name = "Player", Image = "rbxassetid://10747372992" }),
+        Misc = tabGroups.TabGroup1:Tab({ Name = "Misc", Image = "rbxassetid://10723407389" }),
+        Settings = tabGroups.TabGroup1:Tab({ Name = "Settings", Image = "rbxassetid://10734950309" })
+    }
+
+    local sections = {
+        CombatLeft = tabs.Combat:Section({ Side = "Left" }),
+        CombatRight = tabs.Combat:Section({ Side = "Right" }),
+        VisualsLeft = tabs.Visuals:Section({ Side = "Left" }),
+        VisualsRight = tabs.Visuals:Section({ Side = "Right" }),
+        PlayerLeft = tabs.Player:Section({ Side = "Left" }),
+        PlayerRight = tabs.Player:Section({ Side = "Right" }),
+        MiscLeft = tabs.Misc:Section({ Side = "Left" }),
+    }
+
+    sections.CombatLeft:Header({ Name = "Aimbot" })
+
+    sections.CombatLeft:Toggle({
+        Name = "Enable Aimbot",
+        Default = false,
+        Callback = function(value)
+            _G.AimbotEnabled = value
+            Window:Notify({
+                Title = "Cobalt Hub",
+                Description = (value and "Enabled" or "Disabled") .. " Aimbot",
+                Lifetime = 2
+            })
+        end,
+    }, "AimbotToggle")
+
+    sections.CombatLeft:Toggle({
+        Name = "Hold Mode",
+        Default = false,
+        Callback = function(value)
+            _G.AimbotHoldMode = value
+            Window:Notify({
+                Title = "Aimbot Mode",
+                Description = value and "Hold Keybind to Aim" or "Toggle Mode Active",
+                Lifetime = 2
+            })
+        end,
+    }, "AimbotHoldMode")
+
+    sections.CombatLeft:Keybind({
+        Name = "Aimbot Keybind",
+        Default = Enum.KeyCode.E,
+        Callback = function(key)
+            _G.AimbotKeybind = key
+        end,
+    }, "AimbotKeybind")
+
+    sections.CombatLeft:Dropdown({
+        Name = "Aim Part",
+        Default = "Head",
+        List = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"},
+        Callback = function(value)
+            _G.AimPart = value
+        end,
+    }, "AimPartDropdown")
+
+    sections.CombatLeft:Slider({
+        Name = "Smoothness",
+        Default = 0.5,
+        Minimum = 0.1,
+        Maximum = 1,
+        Decimals = 1,
+        Callback = function(value)
+            _G.Sensitivity = value
+        end,
+    }, "SensitivitySlider")
+
+    sections.CombatLeft:Toggle({
+        Name = "Team Check",
+        Default = false,
+        Callback = function(value)
+            _G.TeamCheck = value
+        end,
+    }, "TeamCheckAimbot")
+
+    sections.CombatRight:Header({ Name = "FOV Circle" })
+
+    sections.CombatRight:Toggle({
+        Name = "Show FOV",
+        Default = false,
+        Callback = function(value)
+            _G.CircleVisible = value
+        end,
+    }, "FOVToggle")
+
+    sections.CombatRight:Slider({
+        Name = "FOV Radius",
+        Default = 80,
+        Minimum = 20,
+        Maximum = 500,
+        Decimals = 0,
+        Callback = function(value)
+            _G.CircleRadius = value
+        end,
+    }, "FOVRadiusSlider")
+
+    sections.CombatRight:Colorpicker({
+        Name = "FOV Color",
+        Default = Color3.fromRGB(255, 255, 255),
+        Callback = function(color)
+            _G.CircleColor = color
+        end,
+    }, "FOVColorpicker")
+
+    sections.CombatRight:Slider({
+        Name = "Transparency",
+        Default = 0.7,
+        Minimum = 0,
+        Maximum = 1,
+        Decimals = 2,
+        Callback = function(value)
+            _G.CircleTransparency = value
+        end,
+    }, "FOVTransparency")
+
+    sections.CombatRight:Toggle({
+        Name = "Filled Circle",
+        Default = false,
+        Callback = function(value)
+            _G.CircleFilled = value
+        end,
+    }, "FOVFilled")
+
+    sections.VisualsLeft:Header({ Name = "ESP Features" })
+
+    sections.VisualsLeft:Toggle({
+        Name = "Box ESP",
+        Default = false,
+        Callback = function(value)
+            _G.Box = value
+        end,
+    }, "BoxESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Skeleton ESP",
+        Default = false,
+        Callback = function(value)
+            _G.Skeleton = value
+        end,
+    }, "SkeletonESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Name ESP",
+        Default = false,
+        Callback = function(value)
+            _G.ShowName = value
+        end,
+    }, "NameESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Distance ESP",
+        Default = false,
+        Callback = function(value)
+            _G.Distance = value
+        end,
+    }, "DistanceESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Health Text",
+        Default = false,
+        Callback = function(value)
+            _G.ShowHealthText = value
+        end,
+    }, "HealthTextESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Tracers",
+        Default = false,
+        Callback = function(value)
+            _G.ShowTracer = value
+        end,
+    }, "TracersESP")
+
+    sections.VisualsLeft:Toggle({
+        Name = "Team Check",
+        Default = false,
+        Callback = function(value)
+            _G.TeamCheck = value
+        end,
+    }, "TeamCheckESP")
+
+    sections.VisualsRight:Header({ Name = "ESP Colors" })
+
+    sections.VisualsRight:Colorpicker({
+        Name = "ESP Color",
+        Default = Color3.fromRGB(255, 128, 0),
+        Callback = function(color)
+            _G.Color = color
+        end,
+    }, "ESPColorpicker")
+
+    local alphaColorPicker = sections.VisualsRight:Colorpicker({
+        Name = "Transparency Color",
+        Default = Color3.fromRGB(255, 0, 0),
+        Alpha = 0,
+        Callback = function(color, alpha)
+        end,
+    }, "TransparencyESP")
+
+    local rainbowActive
+    local rainbowConnection
+    local hue = 0
+
+    sections.VisualsRight:Toggle({
+        Name = "Rainbow ESP",
+        Default = false,
+        Callback = function(value)
+            rainbowActive = value
+            if rainbowActive then
+                rainbowConnection = RunService.RenderStepped:Connect(function(deltaTime)
+                    hue = (hue + deltaTime * 0.1) % 1
+                    local rainbowColor = Color3.fromHSV(hue, 1, 1)
+                    alphaColorPicker:SetColor(rainbowColor)
+                    _G.Color = rainbowColor
+                end)
+            elseif rainbowConnection then
+                rainbowConnection:Disconnect()
+                rainbowConnection = nil
+            end
+        end,
+    }, "RainbowESP")
+
+    sections.PlayerLeft:Header({ Name = "Movement" })
+
+    sections.PlayerLeft:Slider({
+        Name = "Walk Speed",
+        Default = 16,
+        Minimum = 16,
+        Maximum = 200,
+        Decimals = 0,
+        Callback = function(value)
+            _G.WalkSpeed = value
+        end,
+    }, "WalkSpeedSlider")
+
+    sections.PlayerLeft:Slider({
+        Name = "Jump Power",
+        Default = 50,
+        Minimum = 50,
+        Maximum = 300,
+        Decimals = 0,
+        Callback = function(value)
+            _G.JumpPower = value
+        end,
+    }, "JumpPowerSlider")
+
+    sections.PlayerLeft:Toggle({
+        Name = "NoClip",
+        Default = false,
+        Callback = function(value)
+            _G.NoClip = value
+        end,
+    }, "NoClipToggle")
+
+    sections.PlayerLeft:Toggle({
+        Name = "Infinite Jump",
+        Default = false,
+        Callback = function(value)
+            _G.InfiniteJump = value
+        end,
+    }, "InfiniteJumpToggle")
+
+    sections.MiscLeft:Header({ Name = "Utilities" })
+
+    sections.MiscLeft:Button({
+        Name = "Rejoin Server",
+        Callback = function()
+            game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+        end,
+    }, "RejoinButton")
+
+    sections.MiscLeft:Button({
+        Name = "Server Hop",
+        Callback = function()
+            local servers = {}
+            local req = game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+            local body = game:GetService("HttpService"):JSONDecode(req)
+            
+            for i, v in pairs(body.data) do
+                if v.id ~= game.JobId and v.playing < v.maxPlayers then
+                    table.insert(servers, v.id)
+                end
+            end
+            
+            if #servers > 0 then
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)])
+            end
+        end,
+    }, "ServerHopButton")
+
+    sections.MiscLeft:Button({
+        Name = "Copy Discord",
+        Callback = function()
+            setclipboard("https://discord.gg/4RR8WXwdAx")
+            Window:Notify({
+                Title = "Cobalt Hub",
+                Description = "Discord link copied!",
+                Lifetime = 3
+            })
+        end,
+    }, "DiscordButton")
+
+    sections.MiscLeft:Label({
+        Text = "Discord: discord.gg/4RR8WXwdAx"
+    })
+
+    MacLib:SetFolder("CobaltHub")
+    tabs.Settings:InsertConfigSection("Left")
+
+    Window.onUnloaded(function()
+        print("Cobalt Hub Unloaded!")
+    end)
+
+    tabs.Combat:Select()
+    MacLib:LoadAutoLoadConfig()
+
+    task.spawn(function()
+        local function newLine()
+            local line = Drawing.new("Line")
+            line.Thickness = 1
+            line.Transparency = 1
+            line.Visible = false
+            line.Color = _G.Color
+            return line
+        end
+
+        local function newText()
+            local txt = Drawing.new("Text")
+            txt.Size = 16
+            txt.Center = true
+            txt.Outline = true
+            txt.OutlineColor = Color3.new(0, 0, 0)
+            txt.Font = 2
+            txt.Color = _G.Color
+            txt.Visible = false
+            return txt
+        end
+
+        local function newBox()
+            local box = {}
+            for i = 1, 4 do
+                box[i] = newLine()
+            end
+            return box
+        end
+
+        local function toScreen(pos)
+            local screenPos, onScreen = Camera:WorldToViewportPoint(pos)
+            return Vector2.new(screenPos.X, screenPos.Y), onScreen, screenPos.Z
+        end
+
+        local function getBones(character)
+            local isR15 = character:FindFirstChild("UpperTorso") ~= nil
+            if isR15 then
+                return {
+                    {"Head", "UpperTorso"},
+                    {"UpperTorso", "LowerTorso"},
+                    {"UpperTorso", "LeftUpperArm"},
+                    {"UpperTorso", "RightUpperArm"},
+                    {"LeftUpperArm", "LeftLowerArm"},
+                    {"RightUpperArm", "RightLowerArm"},
+                    {"LeftLowerArm", "LeftHand"},
+                    {"RightLowerArm", "RightHand"},
+                    {"LowerTorso", "LeftUpperLeg"},
+                    {"LowerTorso", "RightUpperLeg"},
+                    {"LeftUpperLeg", "LeftLowerLeg"},
+                    {"RightUpperLeg", "RightLowerLeg"},
+                    {"LeftLowerLeg", "LeftFoot"},
+                    {"RightLowerLeg", "RightFoot"},
+                }
+            else
+                return {
+                    {"Head", "Torso"},
+                    {"Torso", "Left Arm"},
+                    {"Torso", "Right Arm"},
+                    {"Torso", "Left Leg"},
+                    {"Torso", "Right Leg"},
+                }
+            end
+        end
+
+        local function updateESP()
+            for _, player in pairs(Players:GetPlayers()) do
+                if player == LocalPlayer then continue end
+                if _G.TeamCheck and player.Team == LocalPlayer.Team then continue end
+
+                local char = player.Character
+                if not char then continue end
+
+                local rootPart = char:FindFirstChild("HumanoidRootPart")
+                if not rootPart then continue end
+
+                local pos, onScreen, distance = toScreen(rootPart.Position)
+
+                if not ESP[player] then
+                    ESP[player] = {
+                        Skeleton = {},
+                        Box = newBox(),
+                        Distance = newText(),
+                        Name = newText(),
+                        HealthText = newText(),
+                        HealthBar = { Background = newLine(), Bar = newLine() },
+                        Tracer = newLine()
+                    }
+                end
+
+                if _G.Skeleton then
+                    local bones = getBones(char)
+                    if #ESP[player].Skeleton ~= #bones then
+                        for _, line in pairs(ESP[player].Skeleton) do if line then line:Remove() end end
+                        ESP[player].Skeleton = {}
+                        for _ = 1, #bones do table.insert(ESP[player].Skeleton, newLine()) end
+                    end
+                    for i, bone in ipairs(bones) do
+                        local a = char:FindFirstChild(bone[1])
+                        local b = char:FindFirstChild(bone[2])
+                        local line = ESP[player].Skeleton[i]
+                        if a and b then
+                            local aPos, aOnScreen = toScreen(a.Position)
+                            local bPos, bOnScreen = toScreen(b.Position)
+                            if aOnScreen and bOnScreen then
+                                line.From = aPos
+                                line.To = bPos
+                                line.Visible = true
+                                line.Color = _G.Color
+                            else
+                                line.Visible = false
+                            end
+                        else
+                            line.Visible = false
+                        end
+                    end
+                else
+                    for _, line in pairs(ESP[player].Skeleton) do if line then line.Visible = false end end
+                end
+
+                local head = char:FindFirstChild("Head")
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if _G.Box and head and humanoid then
+                    local headPos, hOnScreen = toScreen(head.Position + Vector3.new(0, 0.5, 0))
+                    local footPos, fOnScreen = toScreen(rootPart.Position - Vector3.new(0, 3, 0))
+                    local box = ESP[player].Box
+
+                    if hOnScreen and fOnScreen then
+                        local height = math.abs(headPos.Y - footPos.Y)
+                        local width = height / 2
+                        local topLeft = Vector2.new(headPos.X - width / 2, headPos.Y)
+                        local topRight = Vector2.new(headPos.X + width / 2, headPos.Y)
+                        local bottomLeft = Vector2.new(headPos.X - width / 2, headPos.Y + height)
+                        local bottomRight = Vector2.new(headPos.X + width / 2, headPos.Y + height)
+
+                        box[1].From, box[1].To = topLeft, topRight
+                        box[2].From, box[2].To = topRight, bottomRight
+                        box[3].From, box[3].To = bottomRight, bottomLeft
+                        box[4].From, box[4].To = bottomLeft, topLeft
+                        for _, line in pairs(box) do line.Visible, line.Color = true, _G.Color end
+
+                        local hpPercent = humanoid.Health / humanoid.MaxHealth
+                        local barHeight = height
+                        local barWidth = 2
+                        local x = headPos.X - width / 2 - 6
+                        local y = headPos.Y
+
+                        local bg = ESP[player].HealthBar.Background
+                        local fg = ESP[player].HealthBar.Bar
+
+                        bg.From = Vector2.new(x, y)
+                        bg.To = Vector2.new(x, y + barHeight)
+                        bg.Color = Color3.new(0, 0, 0)
+                        bg.Thickness = barWidth
+                        bg.Visible = true
+
+                        fg.From = Vector2.new(x, y + (1 - hpPercent) * barHeight)
+                        fg.To = Vector2.new(x, y + barHeight)
+                        fg.Color = Color3.fromRGB(0, 255, 0)
+                        fg.Thickness = barWidth
+                        fg.Visible = true
+                    else
+                        for _, line in pairs(box) do line.Visible = false end
+                        ESP[player].HealthBar.Background.Visible = false
+                        ESP[player].HealthBar.Bar.Visible = false
+                    end
+                else
+                    for _, line in pairs(ESP[player].Box) do line.Visible = false end
+                    ESP[player].HealthBar.Background.Visible = false
+                    ESP[player].HealthBar.Bar.Visible = false
+                end
+
+                if _G.Distance and onScreen then
+                    ESP[player].Distance.Position = Vector2.new(pos.X, pos.Y + 30)
+                    ESP[player].Distance.Text = string.format("[%.1fm]", distance)
+                    ESP[player].Distance.Visible = true
+                    ESP[player].Distance.Color = _G.Color
+                else
+                    ESP[player].Distance.Visible = false
+                end
+
+                if _G.ShowName and onScreen then
+                    ESP[player].Name.Text = player.Name
+                    ESP[player].Name.Position = Vector2.new(pos.X, pos.Y - 15)
+                    ESP[player].Name.Visible = true
+                    ESP[player].Name.Color = _G.Color
+                else
+                    ESP[player].Name.Visible = false
+                end
+
+                if _G.ShowHealthText and onScreen and humanoid then
+                    ESP[player].HealthText.Text = string.format("%.0f%%", humanoid.Health / humanoid.MaxHealth * 100)
+                    ESP[player].HealthText.Position = Vector2.new(pos.X, pos.Y + 45)
+                    ESP[player].HealthText.Visible = true
+                else
+                    ESP[player].HealthText.Visible = false
+                end
+
+                if _G.ShowTracer and onScreen then
+                    local tracer = ESP[player].Tracer
+                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    tracer.To = pos
+                    tracer.Color = _G.Color
+                    tracer.Visible = true
+                else
+                    ESP[player].Tracer.Visible = false
+                end
+            end
+        end
+
+        while task.wait(_G.RefreshRate) do
+            pcall(updateESP)
+        end
+    end)
+
+    Players.PlayerRemoving:Connect(function(player)
+        if ESP[player] then
+            for _, line in pairs(ESP[player].Skeleton or {}) do
+                if line then line:Remove() end
+            end
+            for _, line in pairs(ESP[player].Box or {}) do
+                if line then line:Remove() end
+            end
+            if ESP[player].Distance then ESP[player].Distance:Remove() end
+            if ESP[player].Name then ESP[player].Name:Remove() end
+            if ESP[player].HealthText then ESP[player].HealthText:Remove() end
+            if ESP[player].HealthBar then
+                if ESP[player].HealthBar.Background then ESP[player].HealthBar.Background:Remove() end
+                if ESP[player].HealthBar.Bar then ESP[player].HealthBar.Bar:Re
