@@ -1,10 +1,3 @@
---[[ 
-    Rephon Hub - Compkiller UI Version 
-    Converted for User
-]]
-
--- // 1. CORE LOGIC & BYPASSES (UNTOUCHED) \\ --
-
 getfenv().LPH_NO_VIRTUALIZE = function(f)
     return f
 end
@@ -19,21 +12,20 @@ local CollectionService = game:GetService("CollectionService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 
 local cType = clonefunction(type)
 local old; old = hookfunction(type, newcclosure(function(...)
     local success, result = pcall(cType, ...)
-
     if not success then
         error(result, 0)
     end
-
     if not checkcaller() then
         local args = {...}
         return old(unpack(args))
     end
-
     return old(...)
 end))
 
@@ -187,9 +179,9 @@ local Net = {
 _G.Opts = _G.Opts or {}
 _G.Opts.reach = _G.Opts.reach or false
 _G.Opts.comp_reach = _G.Opts.comp_reach or false
-_G.Opts.reach_x = _G.Opts.reach_x or 15
-_G.Opts.reach_y = _G.Opts.reach_y or 15
-_G.Opts.reach_z = _G.Opts.reach_z or 15
+_G.Opts.reach_x = _G.Opts.reach_x or 7.5
+_G.Opts.reach_y = _G.Opts.reach_y or 7.5
+_G.Opts.reach_z = _G.Opts.reach_z or 7.5
 _G.Opts.offset_x = _G.Opts.offset_x or 0
 _G.Opts.offset_y = _G.Opts.offset_y or 0
 _G.Opts.offset_z = _G.Opts.offset_z or 0
@@ -197,11 +189,21 @@ _G.Opts.inf_stamina = _G.Opts.inf_stamina or false
 _G.Opts.anti_ankle = _G.Opts.anti_ankle or false
 _G.Opts.reach_visualizer_enabled = _G.Opts.reach_visualizer_enabled or false
 _G.Opts.box_transparency = _G.Opts.box_transparency or 0.5
-_G.Opts.auto_goal_target = _G.Opts.auto_goal_target or "Enemy"
 _G.Opts.visualizer_material = _G.Opts.visualizer_material or "ForceField"
 _G.Opts.ball_predictor = _G.Opts.ball_predictor or false
 _G.Opts.ball_predict_color = _G.Opts.ball_predict_color or Color3.fromRGB(100, 180, 255)
 _G.Opts.auto_top_bins = _G.Opts.auto_top_bins or false
+_G.Opts.auto_top_bins_power = _G.Opts.auto_top_bins_power or 200
+_G.Opts.auto_top_bins_curve = _G.Opts.auto_top_bins_curve or 0.3
+_G.Opts.auto_top_bins_corner = _G.Opts.auto_top_bins_corner or "Top Left"
+_G.Opts.auto_top_bins_trail = _G.Opts.auto_top_bins_trail or false
+_G.Opts.auto_top_bins = _G.Opts.auto_top_bins or false
+_G.Opts.auto_top_bins_power = _G.Opts.auto_top_bins_power or 200
+_G.Opts.auto_top_bins_curve = _G.Opts.auto_top_bins_curve or 0.3
+_G.Opts.auto_top_bins_corner = _G.Opts.auto_top_bins_corner or "Top Left"
+_G.Opts.auto_top_bins_trail = _G.Opts.auto_top_bins_trail or false
+_G.Opts.anti_votekick = _G.Opts.anti_votekick or false
+_G.Opts.anti_out = _G.Opts.anti_out or false
 
 local cBalls = {}
 
@@ -250,66 +252,148 @@ local function getClosestBall()
     return closestBall or cBalls[1]
 end
 
-local function getTeamSide()
-    local team = LocalPlayer.Team
-    if not team then return "Home" end
+local reachConn
+local visualizerPart = nil
+local cornerPositions = {}
+local selectedTargetCFrame = nil
+local trailSegments = {}
+local activePaths = {}
 
-    local first = string.split(team.Name, " ")[1]
-    if first == "Home" or first == "Away" then
-        return first
-    end
-    return "Home"
+local function quadraticBezier(t, p0, p1, p2)
+    return (1 - t)^2 * p0 + 2 * (1 - t) * t * p1 + t^2 * p2
 end
 
-local function getNet(targetEnemy)
-    for _, object in ipairs(Workspace:GetChildren()) do
-        if object.Name == "pitch" and object:FindFirstChild("nets") then
-            local nets = object.nets
-            local mySide = getTeamSide()
-            local targetSide
-            
-            if targetEnemy then
-                targetSide = (mySide == "Home") and "Away" or "Home"
-            else
-                targetSide = mySide
-            end
-            
-            if nets:FindFirstChild(targetSide) then
-                return nets[targetSide]
-            end
+local function getAimTeam()
+    if not LocalPlayer.Team then return "Home" end
+    local team = string.split(LocalPlayer.Team.Name, " ")[1]
+    return (team == "Home" and "Away") or "Home"
+end
+
+local function getAimGoal()
+    for _, obj in pairs(Workspace.game:GetChildren()) do
+        if obj.Name == "system" and obj:FindFirstChild("goal") then
+            return obj.goal[getAimTeam()]
         end
     end
 end
 
-local function scoreBall()
-    local targetEnemy = (_G.Opts.auto_goal_target == "Enemy")
-    local net = getNet(targetEnemy)
-    
-    if not net or not net:FindFirstChild("Collide") then
+local function updateCornerPositions()
+    local goal = getAimGoal()
+    if not goal or not goal:IsA("BasePart") then
         return
     end
-    
-    local collide = net.Collide
-    local ball = getClosestBall()
-    
-    if ball and ball.Parent then
-        pcall(function() 
-            ball:SetNetworkOwner(LocalPlayer) 
-        end)
-        
-        task.wait(0.05)
-        
-        ball.CFrame = collide.CFrame
-        ball.AssemblyLinearVelocity = Vector3.zero
-        ball.AssemblyAngularVelocity = Vector3.zero
-        
-        ball.Velocity = Vector3.zero
-        ball.RotVelocity = Vector3.zero
-    end
+
+    local goalSize = goal.Size
+    local goalCFrame = goal.CFrame
+
+    local halfWidth = goalSize.X / 2.2
+    local halfHeight = goalSize.Y / 2.2
+
+    cornerPositions["Top Left"] = goalCFrame * CFrame.new(-halfWidth, halfHeight, 0)
+    cornerPositions["Top Right"] = goalCFrame * CFrame.new(halfWidth, halfHeight, 0)
+    cornerPositions["Bottom Left"] = goalCFrame * CFrame.new(-halfWidth, -halfHeight, 0)
+    cornerPositions["Bottom Right"] = goalCFrame * CFrame.new(halfWidth, -halfHeight, 0)
+
+    selectedTargetCFrame = cornerPositions[_G.Opts.auto_top_bins_corner]
 end
 
-local reachConn
-local visualizerPart = nil
+local function createFake(ball)
+    local fake = ball:Clone()
+    fake.Parent = Workspace
+    fake.Transparency = 1
+    fake.Name = "FakeBall"
+    fake.CanCollide = false
+    CollectionService:RemoveTag(fake, "Ball")
+
+    for _, child in pairs(fake:GetChildren()) do
+        if child.Name == "network" or child.Name == "replication" or child.Name == "properties" then
+            child:Destroy()
+        end
+    end
+    
+    local ncc = Instance.new("NoCollisionConstraint", fake)
+    ncc.Part0 = fake
+    ncc.Part1 = ball
+
+    game:GetService("Debris"):AddItem(fake, 5)
+    return fake
+end
+
+local function createBezierTrail(ball, points, lifeTime)
+    if not _G.Opts.auto_top_bins_trail then return end
+
+    trailSegments[ball] = trailSegments[ball] or {}
+    local count = #points
+    if count < 2 then return end
+
+    for i = 1, count - 1 do
+        local p0 = points[i]
+        local p1 = points[i + 1]
+
+        local part0 = Instance.new("Part")
+        part0.Size = Vector3.new(0.1, 0.1, 0.1)
+        part0.Anchored = true
+        part0.CanCollide = false
+        part0.Transparency = 1
+        part0.CFrame = CFrame.new(p0)
+        part0.Parent = Workspace
+
+        local part1 = Instance.new("Part")
+        part1.Size = Vector3.new(0.1, 0.1, 0.1)
+        part1.Anchored = true
+        part1.CanCollide = false
+        part1.Transparency = 1
+        part1.CFrame = CFrame.new(p1)
+        part1.Parent = Workspace
+
+        local att0 = Instance.new("Attachment")
+        att0.Parent = part0
+
+        local att1 = Instance.new("Attachment")
+        att1.Parent = part1
+
+        local beam = Instance.new("Beam")
+        beam.Attachment0 = att0
+        beam.Attachment1 = att1
+
+        local alpha = (i - 1) / (count - 1)
+        local c = Color3.new(alpha, 1 - alpha, 0)
+        beam.Color = ColorSequence.new(c, c)
+        beam.Width0 = 0.4
+        beam.Width1 = 0.4
+        beam.FaceCamera = true
+        beam.Transparency = NumberSequence.new(0)
+        beam.Parent = part0
+
+        table.insert(trailSegments[ball], {
+            part0 = part0,
+            part1 = part1,
+            beam = beam,
+        })
+
+        game:GetService("Debris"):AddItem(part0, lifeTime + 1)
+        game:GetService("Debris"):AddItem(part1, lifeTime + 1)
+
+        task.spawn(function()
+            local fadeTime = lifeTime
+            local startTime = tick()
+            while beam and beam.Parent and part0 and part0.Parent and part1 and part1.Parent do
+                local tFade = (tick() - startTime) / fadeTime
+                if tFade >= 1 then
+                    break
+                end
+                beam.Transparency = NumberSequence.new(tFade)
+                RunService.Heartbeat:Wait()
+            end
+            if part0 and part0.Parent then
+                part0:Destroy()
+            end
+            if part1 and part1.Parent then
+                part1:Destroy()
+            end
+        end)
+    end
+end
 
 local function updateVis()
     if visualizerPart and visualizerPart.Parent then
@@ -374,9 +458,62 @@ local function destroyVisualizer()
     end
 end
 
--- // 2. GAMEPLAY LOOPS (UNTOUCHED) \\ --
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if _G.Opts.reach_visualizer_enabled then
+        createVisualizer()
+    end
+end)
 
 local infStamConn
+local antiVotekickConn
+local outFolderOriginalParent, outFolderRef
+
+local function toggleAntiVotekick(state)
+    _G.Opts.anti_votekick = state
+
+    if state then
+        if not antiVotekickConn then
+            antiVotekickConn = RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    local voteKickUI = LocalPlayer.PlayerGui.main.voteKick
+                    if voteKickUI.Visible and voteKickUI.main.user.Text == LocalPlayer.Name then
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+                    end
+                end)
+            end)
+        end
+    else
+        if antiVotekickConn then
+            antiVotekickConn:Disconnect()
+            antiVotekickConn = nil
+        end
+    end
+end
+
+local function toggleAntiOut(state)
+    _G.Opts.anti_out = state
+
+    local folder = Workspace:FindFirstChild("game", true)
+    folder = folder and folder:FindFirstChild("system", true)
+    folder = folder and folder:FindFirstChild("out", true)
+
+    if state then
+        if folder and folder.Parent ~= ReplicatedStorage then
+            outFolderOriginalParent = folder.Parent
+            outFolderRef = folder
+            folder.Parent = ReplicatedStorage
+        end
+    else
+        if outFolderRef and outFolderOriginalParent and outFolderRef.Parent ~= outFolderOriginalParent then
+            outFolderRef.Parent = outFolderOriginalParent
+        end
+    end
+end
+
+local function quadraticBezier(t, p0, p1, p2)
+    return (1 - t)^2 * p0 + 2 * (1 - t) * t * p1 + t^2 * p2
+end
 
 local function getAimTeam()
     if not LocalPlayer.Team then return "Home" end
@@ -385,115 +522,360 @@ local function getAimTeam()
 end
 
 local function getAimGoal()
-    for _, obj in pairs(Workspace:GetChildren()) do
-        if obj.Name == "pitch" and obj:FindFirstChild("nets") then
-            local nets = obj.nets
-            local side = getAimTeam()
-            if nets:FindFirstChild(side) then
-                return nets[side]
-            end
+    for _, obj in pairs(Workspace.game:GetChildren()) do
+        if obj.Name == "system" and obj:FindFirstChild("goal") then
+            return obj.goal[getAimTeam()]
         end
     end
 end
 
-local activeBallTracking = {}
+local cornerPositions = {}
+local selectedTargetCFrame = nil
+local trailSegments = {}
 
-RunService.Heartbeat:Connect(function()
-    if not _G.Opts.auto_top_bins then return end
+local function updateCornerPositions()
+    local goal = getAimGoal()
+    if not goal or not goal:IsA("BasePart") then
+        return
+    end
+
+    local goalSize = goal.Size
+    local goalCFrame = goal.CFrame
+
+    local halfWidth = goalSize.X / 2.2
+    local halfHeight = goalSize.Y / 2.2
+
+    cornerPositions["Top Left"] = goalCFrame * CFrame.new(-halfWidth, halfHeight, 0)
+    cornerPositions["Top Right"] = goalCFrame * CFrame.new(halfWidth, halfHeight, 0)
+    cornerPositions["Bottom Left"] = goalCFrame * CFrame.new(-halfWidth, -halfHeight, 0)
+    cornerPositions["Bottom Right"] = goalCFrame * CFrame.new(halfWidth, -halfHeight, 0)
+
+    selectedTargetCFrame = cornerPositions[_G.Opts.auto_top_bins_corner]
+end
+
+local function createFake(ball)
+    local fake = ball:Clone()
+    fake.Parent = Workspace
+    fake.Transparency = 1
+    fake.Name = "FakeBall"
+    fake.CanCollide = false
+    CollectionService:RemoveTag(fake, "Ball")
+
+    for _, child in pairs(fake:GetChildren()) do
+        if child.Name == "network" or child.Name == "replication" or child.Name == "properties" then
+            child:Destroy()
+        end
+    end
     
-    pcall(function()
-        local char = LocalPlayer.Character
-        if not char then return end
+    local ncc = Instance.new("NoCollisionConstraint", fake)
+    ncc.Part0 = fake
+    ncc.Part1 = ball
+
+    game:GetService("Debris"):AddItem(fake, 5)
+    return fake
+end
+
+local function createBezierTrail(ball, points, lifeTime)
+    if not _G.Opts.auto_top_bins_trail then return end
+
+    trailSegments[ball] = trailSegments[ball] or {}
+    local count = #points
+    if count < 2 then return end
+
+    for i = 1, count - 1 do
+        local p0 = points[i]
+        local p1 = points[i + 1]
+
+        local part0 = Instance.new("Part")
+        part0.Size = Vector3.new(0.1, 0.1, 0.1)
+        part0.Anchored = true
+        part0.CanCollide = false
+        part0.Transparency = 1
+        part0.CFrame = CFrame.new(p0)
+        part0.Parent = Workspace
+
+        local part1 = Instance.new("Part")
+        part1.Size = Vector3.new(0.1, 0.1, 0.1)
+        part1.Anchored = true
+        part1.CanCollide = false
+        part1.Transparency = 1
+        part1.CFrame = CFrame.new(p1)
+        part1.Parent = Workspace
+
+        local att0 = Instance.new("Attachment")
+        att0.Parent = part0
+
+        local att1 = Instance.new("Attachment")
+        att1.Parent = part1
+
+        local beam = Instance.new("Beam")
+        beam.Attachment0 = att0
+        beam.Attachment1 = att1
+
+        local alpha = (i - 1) / (count - 1)
+        local c = Color3.new(alpha, 1 - alpha, 0)
+        beam.Color = ColorSequence.new(c, c)
+        beam.Width0 = 0.4
+        beam.Width1 = 0.4
+        beam.FaceCamera = true
+        beam.Transparency = NumberSequence.new(0)
+        beam.Parent = part0
+
+        table.insert(trailSegments[ball], {
+            part0 = part0,
+            part1 = part1,
+            beam = beam,
+        })
+
+        game:GetService("Debris"):AddItem(part0, lifeTime + 1)
+        game:GetService("Debris"):AddItem(part1, lifeTime + 1)
+
+        task.spawn(function()
+            local fadeTime = lifeTime
+            local startTime = tick()
+            while beam and beam.Parent and part0 and part0.Parent and part1 and part1.Parent do
+                local tFade = (tick() - startTime) / fadeTime
+                if tFade >= 1 then
+                    break
+                end
+                beam.Transparency = NumberSequence.new(tFade)
+                RunService.Heartbeat:Wait()
+            end
+            if part0 and part0.Parent then
+                part0:Destroy()
+            end
+            if part1 and part1.Parent then
+                part1:Destroy()
+            end
+        end)
+    end
+end
+
+local ballsFolder = CollectionService:GetTagged("BallsFolder")[1]
+if ballsFolder then
+    ballsFolder.DescendantAdded:Connect(function(bodyVel)
+        local character = LocalPlayer.Character
         
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        if not _G.Opts.auto_top_bins or not character or not character:FindFirstChild("Kick") then
+            return
+        end
+
+        if not bodyVel:IsA("BodyVelocity") or not bodyVel.Parent:IsA("BasePart") then
+            return
+        end
+
+        if not isnetworkowner or not isnetworkowner(bodyVel.Parent) then
+            return
+        end
+
+        local ball = bodyVel.Parent
         
-        local hasKickTool = false
-        for _, tool in pairs(char:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name:lower():find("kick") then
-                hasKickTool = true
-                break
+        if not selectedTargetCFrame then 
+            updateCornerPositions()
+            if not selectedTargetCFrame then return end
+        end
+
+        for _, obj in pairs(ball:GetChildren()) do
+            if obj:IsA("BodyMover") then
+                obj:Destroy()
             end
         end
         
-        if not hasKickTool then return end
+        local fakeBall = createFake(ball)
+        local startPos = fakeBall.Position
+        local targetPos = selectedTargetCFrame.Position
         
-        for _, ball in pairs(cBalls) do
-            if ball and ball.Parent and not activeBallTracking[ball] then
-                local velocity = ball.AssemblyLinearVelocity or ball.Velocity
-                
-                if velocity.Magnitude > 10 then
-                    local distanceToBall = (ball.Position - hrp.Position).Magnitude
-                    
-                    if distanceToBall < 15 then
-                        activeBallTracking[ball] = true
-                        
-                        task.spawn(function()
-                            for i = 1, 5 do
-                                pcall(function() ball:SetNetworkOwner(LocalPlayer) end)
-                                task.wait(0.01)
-                            end
-                            
-                            task.wait(0.1)
-                            
-                            local goal = getAimGoal()
-                            if not goal then 
-                                activeBallTracking[ball] = nil
-                                return 
-                            end
-                            
-                            local goalCenter = goal.Position
-                            local goalSize = goal.Size
-                            
-                            local targetY = goalCenter.Y + (goalSize.Y / 2)
-                            local sideOffset = (goalSize.X / 3.5)
-                            local leftOrRight = math.random() > 0.5 and 1 or -1
-                            local lateralOffset = goal.CFrame.RightVector * (sideOffset * leftOrRight)
-                            
-                            local targetPos = Vector3.new(
-                                goalCenter.X + lateralOffset.X,
-                                targetY,
-                                goalCenter.Z + lateralOffset.Z
-                            )
-                            
-                            local direction = (targetPos - ball.Position).Unit
-                            local distance = (targetPos - ball.Position).Magnitude
-                            local speed = math.clamp(distance * 3, 200, 500)
-                            
-                            ball.AssemblyLinearVelocity = direction * speed
-                            ball.AssemblyAngularVelocity = Vector3.zero
-                            
-                            if ball:FindFirstChild("BodyVelocity") then
-                                ball.BodyVelocity:Destroy()
-                            end
-                            if ball:FindFirstChild("BodyForce") then
-                                ball.BodyForce:Destroy()
-                            end
-                            
-                            local bodyVel = Instance.new("BodyVelocity")
-                            bodyVel.Name = "TopBinsVel"
-                            bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                            bodyVel.Velocity = direction * speed
-                            bodyVel.P = 10000
-                            bodyVel.Parent = ball
-                            
-                            local bodyForce = Instance.new("BodyForce")
-                            bodyForce.Name = "TopBinsForce"
-                            bodyForce.Force = Vector3.new(0, ball:GetMass() * Workspace.Gravity * 1.8, 0)
-                            bodyForce.Parent = ball
-                            
-                            task.delay(3, function()
-                                if bodyVel and bodyVel.Parent then bodyVel:Destroy() end
-                                if bodyForce and bodyForce.Parent then bodyForce:Destroy() end
-                                activeBallTracking[ball] = nil
-                            end)
-                        end)
+        local distance = (targetPos - startPos).Magnitude
+        local midPoint = (startPos + targetPos) / 2
+        local shotDirection = (targetPos - startPos).Unit
+        local sideVector = shotDirection:Cross(Vector3.yAxis).Unit
+        
+        local curveOffset = sideVector * distance * _G.Opts.auto_top_bins_curve
+        local heightOffset = Vector3.new(0, distance * 0.15, 0)
+        local controlPoint = midPoint + curveOffset + heightOffset
+        
+        local duration = distance / math.max(1, _G.Opts.auto_top_bins_power)
+        local steps = math.max(10, math.ceil(distance / 2))
+
+        local connection
+        local deattach
+        
+        deattach = function()
+            if connection then connection:Disconnect() end
+            if fakeBall and fakeBall.Parent then fakeBall:Destroy() end
+            if activePaths[ball] then activePaths[ball] = nil end
+            if trailSegments[ball] then
+                for _, seg in ipairs(trailSegments[ball]) do
+                    if seg.part0 and seg.part0.Parent then
+                        seg.part0:Destroy()
+                    end
+                    if seg.part1 and seg.part1.Parent then
+                        seg.part1:Destroy()
                     end
                 end
+                trailSegments[ball] = nil
             end
         end
+
+        connection = RunService.Heartbeat:Connect(function()
+            if not ball or not ball.Parent or not fakeBall or not fakeBall.Parent then
+                deattach()
+                return
+            end
+            ball.CFrame = fakeBall.CFrame
+            ball.RotVelocity = Vector3.zero
+        end)
+        
+        activePaths[ball] = deattach
+
+        local points = {}
+        for i = 0, steps do
+            local t = i / steps
+            local point = quadraticBezier(t, startPos, controlPoint, targetPos)
+            table.insert(points, point)
+        end
+
+        if _G.Opts.auto_top_bins_trail then
+            createBezierTrail(ball, points, duration)
+        end
+
+        task.spawn(function()
+            for i = 1, steps do
+                if not fakeBall or not fakeBall.Parent then break end
+                
+                local point = points[i + 1] or points[#points]
+                local tween = TweenService:Create(fakeBall, TweenInfo.new(duration / steps, Enum.EasingStyle.Linear), {
+                    Position = point
+                })
+                tween:Play()
+                tween.Completed:Wait()
+            end
+
+            if ball and ball.Parent and fakeBall and fakeBall.Parent then
+                ball.CFrame = fakeBall.CFrame
+                local continueSpeedFactor = 0.4
+                local continueSpeed = _G.Opts.auto_top_bins_power * continueSpeedFactor
+                ball.Velocity = shotDirection * continueSpeed
+                ball.RotVelocity = Vector3.new(0, math.rad(360), 0)
+            end
+            
+            deattach()
+        end)
     end)
-end)
+end
+
+local ballsFolder = CollectionService:GetTagged("BallsFolder")[1]
+if ballsFolder then
+    ballsFolder.DescendantAdded:Connect(function(bodyVel)
+        local character = LocalPlayer.Character
+        
+        if not _G.Opts.auto_top_bins or not character or not character:FindFirstChild("Kick") then
+            return
+        end
+
+        if not bodyVel:IsA("BodyVelocity") or not bodyVel.Parent:IsA("BasePart") then
+            return
+        end
+
+        if not isnetworkowner or not isnetworkowner(bodyVel.Parent) then
+            return
+        end
+
+        local ball = bodyVel.Parent
+        
+        if not selectedTargetCFrame then 
+            updateCornerPositions()
+            if not selectedTargetCFrame then return end
+        end
+
+        for _, obj in pairs(ball:GetChildren()) do
+            if obj:IsA("BodyMover") then
+                obj:Destroy()
+            end
+        end
+        
+        local fakeBall = createFake(ball)
+        local startPos = fakeBall.Position
+        local targetPos = selectedTargetCFrame.Position
+        
+        local distance = (targetPos - startPos).Magnitude
+        local midPoint = (startPos + targetPos) / 2
+        local shotDirection = (targetPos - startPos).Unit
+        local sideVector = shotDirection:Cross(Vector3.yAxis).Unit
+        
+        local curveOffset = sideVector * distance * _G.Opts.auto_top_bins_curve
+        local heightOffset = Vector3.new(0, distance * 0.15, 0)
+        local controlPoint = midPoint + curveOffset + heightOffset
+        
+        local duration = distance / math.max(1, _G.Opts.auto_top_bins_power)
+        local steps = math.max(10, math.ceil(distance / 2))
+
+        local connection
+        local deattach
+        
+        deattach = function()
+            if connection then connection:Disconnect() end
+            if fakeBall and fakeBall.Parent then fakeBall:Destroy() end
+            if activePaths[ball] then activePaths[ball] = nil end
+            if trailSegments[ball] then
+                for _, seg in ipairs(trailSegments[ball]) do
+                    if seg.part0 and seg.part0.Parent then
+                        seg.part0:Destroy()
+                    end
+                    if seg.part1 and seg.part1.Parent then
+                        seg.part1:Destroy()
+                    end
+                end
+                trailSegments[ball] = nil
+            end
+        end
+
+        connection = RunService.Heartbeat:Connect(function()
+            if not ball or not ball.Parent or not fakeBall or not fakeBall.Parent then
+                deattach()
+                return
+            end
+            ball.CFrame = fakeBall.CFrame
+            ball.RotVelocity = Vector3.zero
+        end)
+        
+        activePaths[ball] = deattach
+
+        local points = {}
+        for i = 0, steps do
+            local t = i / steps
+            local point = quadraticBezier(t, startPos, controlPoint, targetPos)
+            table.insert(points, point)
+        end
+
+        if _G.Opts.auto_top_bins_trail then
+            createBezierTrail(ball, points, duration)
+        end
+
+        task.spawn(function()
+            for i = 1, steps do
+                if not fakeBall or not fakeBall.Parent then break end
+                
+                local point = points[i + 1] or points[#points]
+                local tween = TweenService:Create(fakeBall, TweenInfo.new(duration / steps, Enum.EasingStyle.Linear), {
+                    Position = point
+                })
+                tween:Play()
+                tween.Completed:Wait()
+            end
+
+            if ball and ball.Parent and fakeBall and fakeBall.Parent then
+                ball.CFrame = fakeBall.CFrame
+                local continueSpeedFactor = 0.4
+                local continueSpeed = _G.Opts.auto_top_bins_power * continueSpeedFactor
+                ball.Velocity = shotDirection * continueSpeed
+                ball.RotVelocity = Vector3.new(0, math.rad(360), 0)
+            end
+            
+            deattach()
+        end)
+    end)
+end
 
 RunService.Heartbeat:Connect(function()
     pcall(function()
@@ -521,26 +903,118 @@ RunService.Heartbeat:Connect(function()
             end)
 
             local ball = balls[1]
-            if not ball or ball.AssemblyLinearVelocity.Magnitude < 5 then return end
+            local vel = ball.AssemblyLinearVelocity or ball.Velocity
+            if not ball or vel.Magnitude < 5 then return end
 
-            local pos = ball.Position
-            local vel = ball.AssemblyLinearVelocity
-            local grav = Workspace.Gravity
-            local ground = hrp.Position.Y - 2
-            local points = {}
+            local PHYSICS_STEP = 0.008333333333333333
+            local MAX_SIMULATION_TIME = 4
+            local MAX_BOUNCES = 3
+            local STOP_SPEED = 1
+            local MAX_STEP_DISTANCE = 6
+            local PUSHOUT = 0.03
+            local DRAG_COEFFICIENT = 0.05
+            local DEFAULT_RESTITUTION = 0.7
+            local DEFAULT_FRICTION = 0.15
 
-            for i = 1, 25 do
-                local t = i * 0.1
-                local futurePos = pos + (vel * t) + Vector3.new(0, -0.5 * grav * t * t, 0)
-                if futurePos.Y <= ground then
-                    table.insert(points, Vector3.new(futurePos.X, ground, futurePos.Z))
-                    break
-                else
-                    table.insert(points, futurePos)
+            local position = ball.Position
+            local velocity = vel
+            local mass = ball.AssemblyMass or 1
+            local gravity = Vector3.new(0, -Workspace.Gravity, 0)
+
+            local bodyVelocity = ball:FindFirstChildOfClass("BodyVelocity")
+            local bodyForce = ball:FindFirstChildOfClass("BodyForce")
+            local vectorForce = ball:FindFirstChildOfClass("VectorForce", true)
+            local linearVelocity = ball:FindFirstChildOfClass("LinearVelocity", true)
+
+            local initialBodyVelocity = bodyVelocity and bodyVelocity.Velocity or Vector3.zero
+            local initialBodyForce = bodyForce and bodyForce.Force or Vector3.zero
+            local initialVectorForce = vectorForce and vectorForce.Force or Vector3.zero
+            local initialLinearVelocity = linearVelocity and (linearVelocity.VectorVelocity or linearVelocity.LineVelocity) or nil
+
+            local rayParams = RaycastParams.new()
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            rayParams.FilterDescendantsInstances = { ball }
+
+            local function dragForce(v)
+                local m = v.Magnitude
+                if DRAG_COEFFICIENT <= 0 or m < 1e-3 then
+                    return Vector3.zero
                 end
+                return -v.Unit * (m * m) * DRAG_COEFFICIENT
             end
 
-            if #points < 2 then return end
+            local points = {}
+            local bounces = 0
+            local currentTime = 0
+
+            while currentTime < MAX_SIMULATION_TIME and #points < 600 do
+                table.insert(points, position)
+
+                local dt = PHYSICS_STEP
+                local moveDist = velocity.Magnitude * dt
+
+                if moveDist > MAX_STEP_DISTANCE then
+                    dt = math.max(MAX_STEP_DISTANCE / math.max(velocity.Magnitude, 1e-6), 0.0020833333333333333)
+                end
+
+                local totalForce = gravity * mass + dragForce(velocity)
+
+                if currentTime < 0.3 and bodyVelocity then
+                    velocity = initialBodyVelocity
+                end
+
+                if currentTime < 1.0 then
+                    if bodyForce then
+                        totalForce = totalForce + initialBodyForce
+                    end
+                    if vectorForce then
+                        totalForce = totalForce + initialVectorForce
+                    end
+                    if initialLinearVelocity then
+                        velocity = initialLinearVelocity
+                    end
+                end
+
+                local acceleration = totalForce / mass
+                velocity = velocity + (acceleration * dt)
+                local displacement = velocity * dt
+                local newPos = position + displacement
+                local hit = Workspace:Raycast(position, displacement, rayParams)
+
+                if hit then
+                    position = hit.Position
+                    bounces = bounces + 1
+                    local restitution = DEFAULT_RESTITUTION
+                    local friction = DEFAULT_FRICTION
+                    
+                    if hit.Instance and hit.Instance:IsA("BasePart") then
+                        local props = hit.Instance.CustomPhysicalProperties
+                        if props then
+                            restitution = props.Elasticity or restitution
+                            friction = props.Friction or friction
+                        end
+                    end
+
+                    local normal = hit.Normal.Unit
+                    local vN = normal * velocity:Dot(normal)
+                    local vT = velocity - vN
+                    velocity = (-restitution) * vN + (1 - friction) * vT
+                    position = position + (normal * PUSHOUT)
+
+                    if bounces > MAX_BOUNCES or velocity.Magnitude < STOP_SPEED then
+                        table.insert(points, position)
+                        break
+                    end
+                else
+                    position = newPos
+                end
+
+                currentTime = currentTime + dt
+            end
+
+            if #points == 0 or points[#points] ~= position then
+                table.insert(points, position)
+            end
 
             for i = 1, #points - 1 do
                 local att0 = Instance.new("Attachment")
@@ -582,48 +1056,32 @@ RunService.Heartbeat:Connect(function()
     end)
 end)
 
--- // 3. COMPKILLER UI IMPLEMENTATION \\ --
+local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
+local SaveManager = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/SaveManager.luau"))()
+local InterfaceManager = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
 
-local Compkiller = loadstring(game:HttpGet("https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"))();
+local Window = Library:CreateWindow{
+    Title = "Rephon Hub",
+    SubTitle = "V1.0.0",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(480, 525),
+    Resize = true,
+    MinSize = Vector2.new(400, 380),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightShift
+}
 
--- Config Manager
-local ConfigManager = Compkiller:ConfigManager({
-	Directory = "RephonHub",
-	Config = "MainConfig"
-});
+local Tabs = {
+    Reach = Window:CreateTab{ Title = "Reach", Icon = "box" },
+    Player = Window:CreateTab{ Title = "Player", Icon = "user" },
+    Ball = Window:CreateTab{ Title = "Ball", Icon = "disc" },
+    Misc = Window:CreateTab{ Title = "Misc", Icon = "settings-2" },
+    Config = Window:CreateTab{ Title = "Config", Icon = "settings" }
+}
 
--- Loader
-Compkiller:Loader("rbxassetid://120245531583106", 2).yield();
-
--- Window
-local Window = Compkiller.new({
-	Name = "REPHON HUB",
-	Keybind = "RightShift",
-	Logo = "rbxassetid://120245531583106",
-	Scale = Compkiller.Scale.Window,
-	TextSize = 15,
-});
-
--- Watermark
-local Watermark = Window:Watermark();
-Watermark:AddText({ Icon = "user", Text = LocalPlayer.Name });
-Watermark:AddText({ Icon = "clock", Text = Compkiller:GetDate() });
-
--- // TAB 1: REACH \\ --
-local ReachTab = Window:DrawTab({
-	Name = "Reach",
-	Icon = "box", -- Assuming box icon exists
-	Type = "Double", -- Split into left/right sections
-    EnableScrolling = true
-});
-
-local ReachLeft = ReachTab:DrawSection({ Name = "Reach Settings", Position = "left" });
-local ReachRight = ReachTab:DrawSection({ Name = "Visuals & Offset", Position = "right" });
-
--- Reach Toggle
-ReachLeft:AddToggle({
-	Name = "Enable Reach",
-    Flag = "Reach_Toggle",
+Tabs.Reach:CreateToggle("EnableReach", {
+	Title = "Enable Reach",
 	Default = false,
 	Callback = function(state)
         _G.Opts.reach = state
@@ -678,82 +1136,78 @@ ReachLeft:AddToggle({
             reachConn = nil
         end
     end
-});
+})
 
-ReachLeft:AddToggle({
-    Name = "Comp Reach",
-    Flag = "Comp_Reach",
+Tabs.Reach:CreateToggle("CompReach", {
+    Title = "Comp Reach",
     Default = false,
     Callback = function(state)
         _G.Opts.comp_reach = state
     end
 })
 
-ReachLeft:AddSlider({
-    Name = "Reach X",
-    Flag = "Reach_X",
-    Min = 0, Max = 30, Default = 15,
+Tabs.Reach:CreateSlider("ReachX", {
+    Title = "Reach X",
+    Min = 0, Max = 12, Default = 7.5,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.reach_x = s
         updateVis()
     end
 })
 
-ReachLeft:AddSlider({
-    Name = "Reach Y",
-    Flag = "Reach_Y",
-    Min = 0, Max = 30, Default = 15,
+Tabs.Reach:CreateSlider("ReachY", {
+    Title = "Reach Y",
+    Min = 0, Max = 12, Default = 7.5,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.reach_y = s
         updateVis()
     end
 })
 
-ReachLeft:AddSlider({
-    Name = "Reach Z",
-    Flag = "Reach_Z",
-    Min = 0, Max = 30, Default = 15,
+Tabs.Reach:CreateSlider("ReachZ", {
+    Title = "Reach Z",
+    Min = 0, Max = 12, Default = 7.5,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.reach_z = s
         updateVis()
     end
 })
 
--- Offsets
-ReachRight:AddSlider({
-    Name = "Offset X",
-    Flag = "Offset_X",
+Tabs.Reach:CreateSlider("OffsetX", {
+    Title = "Offset X",
     Min = -10, Max = 10, Default = 0,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.offset_x = s
         updateVis()
     end
 })
 
-ReachRight:AddSlider({
-    Name = "Offset Y",
-    Flag = "Offset_Y",
+Tabs.Reach:CreateSlider("OffsetY", {
+    Title = "Offset Y",
     Min = -10, Max = 10, Default = 0,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.offset_y = s
         updateVis()
     end
 })
 
-ReachRight:AddSlider({
-    Name = "Offset Z",
-    Flag = "Offset_Z",
+Tabs.Reach:CreateSlider("OffsetZ", {
+    Title = "Offset Z",
     Min = -10, Max = 10, Default = 0,
+    Rounding = 1,
     Callback = function(s)
         _G.Opts.offset_z = s
         updateVis()
     end
 })
 
--- Visualizer
-ReachRight:AddToggle({
-    Name = "Reach Visualizer",
-    Flag = "Vis_Enabled",
+Tabs.Reach:CreateToggle("ReachVisualizer", {
+    Title = "Reach Visualizer",
     Default = false,
     Callback = function(state)
         _G.Opts.reach_visualizer_enabled = state
@@ -766,40 +1220,29 @@ ReachRight:AddToggle({
     end
 })
 
-ReachRight:AddSlider({
-    Name = "Box Transparency",
-    Flag = "Box_Trans",
+Tabs.Reach:CreateSlider("BoxTransparency", {
+    Title = "Box Transparency",
     Min = 0, Max = 1, Default = 0.5,
+    Rounding = 2,
     Callback = function(s)
         _G.Opts.box_transparency = s
         updateVis()
     end
 })
 
-ReachRight:AddDropdown({
-    Name = "Material",
-    Flag = "Vis_Mat",
+Tabs.Reach:CreateDropdown("VisualizerMaterial", {
+    Title = "Material",
     Default = "ForceField",
     Values = {"ForceField", "Neon", "Glass", "Plastic", "Metal"},
+    Multi = false,
     Callback = function(v)
         _G.Opts.visualizer_material = v
         updateVis()
     end
 })
 
-
--- // TAB 2: PLAYER \\ --
-local PlayerTab = Window:DrawTab({
-    Name = "Player",
-    Icon = "user",
-    Type = "Single"
-})
-
-local PlayerSection = PlayerTab:DrawSection({ Name = "Character" })
-
-PlayerSection:AddToggle({
-    Name = "Infinite Stamina",
-    Flag = "Inf_Stam",
+Tabs.Player:CreateToggle("InfiniteStamina", {
+    Title = "Infinite Stamina",
     Default = false,
     Callback = function(state)
         _G.Opts.inf_stamina = state
@@ -826,76 +1269,187 @@ PlayerSection:AddToggle({
     end
 })
 
-PlayerSection:AddToggle({
-    Name = "Anti Ankle",
-    Flag = "Anti_Ankle",
+Tabs.Player:CreateToggle("AntiAnkle", {
+    Title = "Anti Ankle",
     Default = false,
     Callback = function(state)
         _G.Opts.anti_ankle = state
     end
 })
 
-
--- // TAB 3: BALL \\ --
-local BallTab = Window:DrawTab({
-    Name = "Ball",
-    Icon = "disc", -- Assuming disc/ball icon
-    Type = "Double"
+Tabs.Player:CreateToggle("AntiVotekick", {
+    Title = "Anti Votekick",
+    Default = false,
+    Callback = function(state)
+        toggleAntiVotekick(state)
+    end
 })
 
-local BallLeft = BallTab:DrawSection({ Name = "General", Position = "left" })
-local BallRight = BallTab:DrawSection({ Name = "Auto Goal", Position = "right" })
+Tabs.Player:CreateToggle("AntiOut", {
+    Title = "Anti Out",
+    Default = false,
+    Callback = function(state)
+        toggleAntiOut(state)
+    end
+})
 
-BallLeft:AddToggle({
-    Name = "Ball Predictor",
-    Flag = "Ball_Pred",
+Tabs.Ball:CreateToggle("BallPredictor", {
+    Title = "Ball Predictor",
     Default = false,
     Callback = function(state)
         _G.Opts.ball_predictor = state
     end
 })
 
-BallLeft:AddColorPicker({
-    Name = "Predictor Color",
-    Flag = "Pred_Color",
-    Default = Color3.fromRGB(100, 180, 255),
-    Callback = function(v)
-        _G.Opts.ball_predict_color = v
-    end
-})
-
-BallRight:AddToggle({
-    Name = "Enable Auto Top Bins",
-    Flag = "Top_Bins",
+Tabs.Ball:CreateToggle("AutoTopBins", {
+    Title = "Auto Top Bins",
     Default = false,
     Callback = function(state)
         _G.Opts.auto_top_bins = state
+        if state then
+            updateCornerPositions()
+        end
     end
 })
 
-BallRight:AddDropdown({
-    Name = "Goal Target",
-    Flag = "Goal_Target",
-    Default = "Enemy",
-    Values = {"Enemy", "Own"},
+Tabs.Ball:CreateSlider("ShotPower", {
+    Title = "Shot Power",
+    Min = 150, Max = 400, Default = 200,
+    Rounding = 0,
     Callback = function(v)
-        _G.Opts.auto_goal_target = v
+        _G.Opts.auto_top_bins_power = v
     end
 })
 
-BallRight:AddButton({
-    Name = "Instant Goal",
+Tabs.Ball:CreateSlider("Curve", {
+    Title = "Curve",
+    Min = -1.5, Max = 1.5, Default = 0.3,
+    Rounding = 2,
+    Callback = function(v)
+        _G.Opts.auto_top_bins_curve = v
+    end
+})
+
+Tabs.Ball:CreateDropdown("TargetCorner", {
+    Title = "Target Corner",
+    Values = {"Top Left", "Top Right", "Bottom Left", "Bottom Right"},
+    Multi = false,
+    Default = 1,
+    Callback = function(v)
+        _G.Opts.auto_top_bins_corner = v
+        updateCornerPositions()
+    end
+})
+
+Tabs.Ball:CreateToggle("ShowTrail", {
+    Title = "Show Trail",
+    Default = false,
+    Callback = function(state)
+        _G.Opts.auto_top_bins_trail = state
+    end
+})
+
+getgenv().PostieSpooferConfig = {
+    Delay = 0,
+    RealLag = false
+}
+
+task.spawn(function()
+    local Postie = nil
+
+    for _, v in pairs(getgc(true)) do
+        if type(v) == "table" then
+            if rawget(v, "SetCallback") and rawget(v, "InvokeClient") and rawget(v, "InvokeServer") then
+                Postie = v
+                break
+            end
+        end
+    end
+
+    if not Postie then 
+        return
+    end
+
+    Postie.SetCallback("Ping", function(...)
+        local cfg = getgenv().PostieSpooferConfig
+        if cfg.Delay > 0 then
+            task.wait(cfg.Delay)
+        end
+        return true
+    end)
+
+    if not getgenv().PostieOriginalInvoke then
+        getgenv().PostieOriginalInvoke = Postie.InvokeServer
+        
+        Postie.InvokeServer = function(self, ...)
+            local cfg = getgenv().PostieSpooferConfig
+            if cfg.RealLag and cfg.Delay > 0 then
+                task.wait(cfg.Delay)
+            end
+            return getgenv().PostieOriginalInvoke(self, ...)
+        end
+    end
+end)
+
+Tabs.Misc:CreateToggle("RealLag", {
+    Title = "Real Lag (Affects Gameplay)",
+    Default = false,
+    Callback = function(state)
+        getgenv().PostieSpooferConfig.RealLag = state
+    end
+})
+
+Tabs.Misc:CreateInput("PingSpoofAmount", {
+    Title = "Spoof Ping (ms)",
+    Default = "0",
+    Placeholder = "e.g. 150",
+    Numeric = true,
+    Finished = true,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then
+            getgenv().PostieSpooferConfig.Delay = num / 1000
+        else
+            getgenv().PostieSpooferConfig.Delay = 0
+        end
+    end
+})
+
+Tabs.Misc:CreateButton{
+    Title = "Rejoin Server",
     Callback = function()
-        scoreBall()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
     end
-})
+}
 
+Tabs.Misc:CreateButton{
+    Title = "Copy Game ID",
+    Callback = function()
+        setclipboard(tostring(game.PlaceId))
+        Library:Notify{
+            Title = "Copied!",
+            Content = "Game ID copied to clipboard",
+            Duration = 3
+        }
+    end
+}
 
--- // TAB 4: CONFIGS & THEMES \\ --
-local ConfigUI = Window:DrawConfig({
-	Name = "Config",
-	Icon = "folder",
-	Config = ConfigManager
-});
+SaveManager:SetLibrary(Library)
+InterfaceManager:SetLibrary(Library)
 
-ConfigUI:Init();
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes{}
+
+InterfaceManager:SetFolder("RephonHub")
+SaveManager:SetFolder("RephonHub/MainConfig")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Config)
+SaveManager:BuildConfigSection(Tabs.Config)
+
+Window:SelectTab(1)
+
+Library:Notify{
+    Title = "Rephon Hub",
+    Content = "Successfully loaded!",
+    Duration = 3
+}
