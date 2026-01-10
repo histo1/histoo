@@ -1,3 +1,50 @@
+
+local HttpService = game:GetService("HttpService")
+local Market = game:GetService("MarketplaceService")
+local Player = game.Players.LocalPlayer
+local HWID = game:GetService("RbxAnalyticsService"):GetClientId()
+local DiscordWebhook = "https://discord.com/api/webhooks/1459573854568710341/hnTvq0FeZVCEHbVx9Uicx4Jp0LfNgNNvqI01mUwVlY0RXFOivRVSqUz0xGbEQIFMKgBA"
+
+local function SendWebhook(Status)
+    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+    if request then
+        task.spawn(function()
+            pcall(function()
+                local GameName = Market:GetProductInfo(game.PlaceId).Name
+                local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
+                local headshot = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=420&height=420&format=png"
+                
+                request({
+                    Url = DiscordWebhook,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({
+                        ["embeds"] = {{
+                            ["title"] = "❤️‍🩹 [ SCRIPT EXECUTION made by vestro ]",
+                            ["description"] = "**Current Status:** " .. Status,
+                            ["color"] = 65280, 
+                            ["thumbnail"] = {["url"] = headshot},
+                            ["fields"] = {
+                                {["name"] = "👤 User", ["value"] = Player.DisplayName .. " (ID: " .. Player.UserId .. ")", ["inline"] = false},
+                                {["name"] = "⚙️ Executor", ["value"] = "```" .. executor .. "```", ["inline"] = false},
+                                {["name"] = "🎮 Game", ["value"] = GameName, ["inline"] = false},
+                                {["name"] = "🆔 HWID", ["value"] = "```" .. HWID .. "```", ["inline"] = false},
+                                {["name"] = "🔗 Links", ["value"] = "[Profile](https://www.roblox.com/users/"..Player.UserId.."/profile) | [Join Server](https://www.roblox.com/games/"..game.PlaceId..")", ["inline"] = false}
+                            },
+                            ["footer"] = {["text"] = "Vestro Security • " .. os.date("%X")},
+                            ["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                        }}
+                    })
+                })
+            end)
+        end)
+    end
+end
+
+SendWebhook("Script Executed")
+
+-- [[ BEGINNING OF YOUR FULL SCRIPT ]]
+
 getfenv().LPH_NO_VIRTUALIZE = function(f)
     return f
 end
@@ -192,11 +239,6 @@ _G.Opts.box_transparency = _G.Opts.box_transparency or 0.5
 _G.Opts.visualizer_material = _G.Opts.visualizer_material or "ForceField"
 _G.Opts.ball_predictor = _G.Opts.ball_predictor or false
 _G.Opts.ball_predict_color = _G.Opts.ball_predict_color or Color3.fromRGB(100, 180, 255)
-_G.Opts.auto_top_bins = _G.Opts.auto_top_bins or false
-_G.Opts.auto_top_bins_power = _G.Opts.auto_top_bins_power or 200
-_G.Opts.auto_top_bins_curve = _G.Opts.auto_top_bins_curve or 0.3
-_G.Opts.auto_top_bins_corner = _G.Opts.auto_top_bins_corner or "Top Left"
-_G.Opts.auto_top_bins_trail = _G.Opts.auto_top_bins_trail or false
 _G.Opts.auto_top_bins = _G.Opts.auto_top_bins or false
 _G.Opts.auto_top_bins_power = _G.Opts.auto_top_bins_power or 200
 _G.Opts.auto_top_bins_curve = _G.Opts.auto_top_bins_curve or 0.3
@@ -509,259 +551,6 @@ local function toggleAntiOut(state)
             outFolderRef.Parent = outFolderOriginalParent
         end
     end
-end
-
-local function quadraticBezier(t, p0, p1, p2)
-    return (1 - t)^2 * p0 + 2 * (1 - t) * t * p1 + t^2 * p2
-end
-
-local function getAimTeam()
-    if not LocalPlayer.Team then return "Home" end
-    local team = string.split(LocalPlayer.Team.Name, " ")[1]
-    return (team == "Home" and "Away") or "Home"
-end
-
-local function getAimGoal()
-    for _, obj in pairs(Workspace.game:GetChildren()) do
-        if obj.Name == "system" and obj:FindFirstChild("goal") then
-            return obj.goal[getAimTeam()]
-        end
-    end
-end
-
-local cornerPositions = {}
-local selectedTargetCFrame = nil
-local trailSegments = {}
-
-local function updateCornerPositions()
-    local goal = getAimGoal()
-    if not goal or not goal:IsA("BasePart") then
-        return
-    end
-
-    local goalSize = goal.Size
-    local goalCFrame = goal.CFrame
-
-    local halfWidth = goalSize.X / 2.2
-    local halfHeight = goalSize.Y / 2.2
-
-    cornerPositions["Top Left"] = goalCFrame * CFrame.new(-halfWidth, halfHeight, 0)
-    cornerPositions["Top Right"] = goalCFrame * CFrame.new(halfWidth, halfHeight, 0)
-    cornerPositions["Bottom Left"] = goalCFrame * CFrame.new(-halfWidth, -halfHeight, 0)
-    cornerPositions["Bottom Right"] = goalCFrame * CFrame.new(halfWidth, -halfHeight, 0)
-
-    selectedTargetCFrame = cornerPositions[_G.Opts.auto_top_bins_corner]
-end
-
-local function createFake(ball)
-    local fake = ball:Clone()
-    fake.Parent = Workspace
-    fake.Transparency = 1
-    fake.Name = "FakeBall"
-    fake.CanCollide = false
-    CollectionService:RemoveTag(fake, "Ball")
-
-    for _, child in pairs(fake:GetChildren()) do
-        if child.Name == "network" or child.Name == "replication" or child.Name == "properties" then
-            child:Destroy()
-        end
-    end
-    
-    local ncc = Instance.new("NoCollisionConstraint", fake)
-    ncc.Part0 = fake
-    ncc.Part1 = ball
-
-    game:GetService("Debris"):AddItem(fake, 5)
-    return fake
-end
-
-local function createBezierTrail(ball, points, lifeTime)
-    if not _G.Opts.auto_top_bins_trail then return end
-
-    trailSegments[ball] = trailSegments[ball] or {}
-    local count = #points
-    if count < 2 then return end
-
-    for i = 1, count - 1 do
-        local p0 = points[i]
-        local p1 = points[i + 1]
-
-        local part0 = Instance.new("Part")
-        part0.Size = Vector3.new(0.1, 0.1, 0.1)
-        part0.Anchored = true
-        part0.CanCollide = false
-        part0.Transparency = 1
-        part0.CFrame = CFrame.new(p0)
-        part0.Parent = Workspace
-
-        local part1 = Instance.new("Part")
-        part1.Size = Vector3.new(0.1, 0.1, 0.1)
-        part1.Anchored = true
-        part1.CanCollide = false
-        part1.Transparency = 1
-        part1.CFrame = CFrame.new(p1)
-        part1.Parent = Workspace
-
-        local att0 = Instance.new("Attachment")
-        att0.Parent = part0
-
-        local att1 = Instance.new("Attachment")
-        att1.Parent = part1
-
-        local beam = Instance.new("Beam")
-        beam.Attachment0 = att0
-        beam.Attachment1 = att1
-
-        local alpha = (i - 1) / (count - 1)
-        local c = Color3.new(alpha, 1 - alpha, 0)
-        beam.Color = ColorSequence.new(c, c)
-        beam.Width0 = 0.4
-        beam.Width1 = 0.4
-        beam.FaceCamera = true
-        beam.Transparency = NumberSequence.new(0)
-        beam.Parent = part0
-
-        table.insert(trailSegments[ball], {
-            part0 = part0,
-            part1 = part1,
-            beam = beam,
-        })
-
-        game:GetService("Debris"):AddItem(part0, lifeTime + 1)
-        game:GetService("Debris"):AddItem(part1, lifeTime + 1)
-
-        task.spawn(function()
-            local fadeTime = lifeTime
-            local startTime = tick()
-            while beam and beam.Parent and part0 and part0.Parent and part1 and part1.Parent do
-                local tFade = (tick() - startTime) / fadeTime
-                if tFade >= 1 then
-                    break
-                end
-                beam.Transparency = NumberSequence.new(tFade)
-                RunService.Heartbeat:Wait()
-            end
-            if part0 and part0.Parent then
-                part0:Destroy()
-            end
-            if part1 and part1.Parent then
-                part1:Destroy()
-            end
-        end)
-    end
-end
-
-local ballsFolder = CollectionService:GetTagged("BallsFolder")[1]
-if ballsFolder then
-    ballsFolder.DescendantAdded:Connect(function(bodyVel)
-        local character = LocalPlayer.Character
-        
-        if not _G.Opts.auto_top_bins or not character or not character:FindFirstChild("Kick") then
-            return
-        end
-
-        if not bodyVel:IsA("BodyVelocity") or not bodyVel.Parent:IsA("BasePart") then
-            return
-        end
-
-        if not isnetworkowner or not isnetworkowner(bodyVel.Parent) then
-            return
-        end
-
-        local ball = bodyVel.Parent
-        
-        if not selectedTargetCFrame then 
-            updateCornerPositions()
-            if not selectedTargetCFrame then return end
-        end
-
-        for _, obj in pairs(ball:GetChildren()) do
-            if obj:IsA("BodyMover") then
-                obj:Destroy()
-            end
-        end
-        
-        local fakeBall = createFake(ball)
-        local startPos = fakeBall.Position
-        local targetPos = selectedTargetCFrame.Position
-        
-        local distance = (targetPos - startPos).Magnitude
-        local midPoint = (startPos + targetPos) / 2
-        local shotDirection = (targetPos - startPos).Unit
-        local sideVector = shotDirection:Cross(Vector3.yAxis).Unit
-        
-        local curveOffset = sideVector * distance * _G.Opts.auto_top_bins_curve
-        local heightOffset = Vector3.new(0, distance * 0.15, 0)
-        local controlPoint = midPoint + curveOffset + heightOffset
-        
-        local duration = distance / math.max(1, _G.Opts.auto_top_bins_power)
-        local steps = math.max(10, math.ceil(distance / 2))
-
-        local connection
-        local deattach
-        
-        deattach = function()
-            if connection then connection:Disconnect() end
-            if fakeBall and fakeBall.Parent then fakeBall:Destroy() end
-            if activePaths[ball] then activePaths[ball] = nil end
-            if trailSegments[ball] then
-                for _, seg in ipairs(trailSegments[ball]) do
-                    if seg.part0 and seg.part0.Parent then
-                        seg.part0:Destroy()
-                    end
-                    if seg.part1 and seg.part1.Parent then
-                        seg.part1:Destroy()
-                    end
-                end
-                trailSegments[ball] = nil
-            end
-        end
-
-        connection = RunService.Heartbeat:Connect(function()
-            if not ball or not ball.Parent or not fakeBall or not fakeBall.Parent then
-                deattach()
-                return
-            end
-            ball.CFrame = fakeBall.CFrame
-            ball.RotVelocity = Vector3.zero
-        end)
-        
-        activePaths[ball] = deattach
-
-        local points = {}
-        for i = 0, steps do
-            local t = i / steps
-            local point = quadraticBezier(t, startPos, controlPoint, targetPos)
-            table.insert(points, point)
-        end
-
-        if _G.Opts.auto_top_bins_trail then
-            createBezierTrail(ball, points, duration)
-        end
-
-        task.spawn(function()
-            for i = 1, steps do
-                if not fakeBall or not fakeBall.Parent then break end
-                
-                local point = points[i + 1] or points[#points]
-                local tween = TweenService:Create(fakeBall, TweenInfo.new(duration / steps, Enum.EasingStyle.Linear), {
-                    Position = point
-                })
-                tween:Play()
-                tween.Completed:Wait()
-            end
-
-            if ball and ball.Parent and fakeBall and fakeBall.Parent then
-                ball.CFrame = fakeBall.CFrame
-                local continueSpeedFactor = 0.4
-                local continueSpeed = _G.Opts.auto_top_bins_power * continueSpeedFactor
-                ball.Velocity = shotDirection * continueSpeed
-                ball.RotVelocity = Vector3.new(0, math.rad(360), 0)
-            end
-            
-            deattach()
-        end)
-    end)
 end
 
 local ballsFolder = CollectionService:GetTagged("BallsFolder")[1]
@@ -1450,6 +1239,6 @@ Window:SelectTab(1)
 
 Library:Notify{
     Title = "Rephon Hub",
-    Content = "Successfully loaded!",
+    Content = "Successfully loaded with Vestro Logger!",
     Duration = 3
 }
