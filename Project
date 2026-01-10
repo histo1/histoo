@@ -1,697 +1,907 @@
-local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
+getfenv().LPH_NO_VIRTUALIZE = function(f)
+    return f
+end
 
-local GAMES = {
-    TouchFootball = 16447934574,
-    Arsenal = 286090429,
-    Counterblox = 301549746,
-    RFL = 70539431141054,
-    RF24 = 14004668761
+_G.check = function()
+    return true
+end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local LocalPlayer = Players.LocalPlayer
+
+local cType = clonefunction(type)
+local old; old = hookfunction(type, newcclosure(function(...)
+    local success, result = pcall(cType, ...)
+
+    if not success then
+        error(result, 0)
+    end
+
+    if not checkcaller() then
+        local args = {...}
+        
+        if cType(args[1]) == "table" then
+        else
+        end
+
+        return old(unpack(args))
+    end
+
+    return old(...)
+end))
+
+for _, tbl in pairs(getgc(true)) do
+    if type(tbl) == "table" and rawget(tbl, "react") and rawget(tbl, "overlapCheck") then
+        rawset(tbl, "overlapCheck", function()
+            return true
+        end)
+        break
+    end
+end
+
+local mt = getrawmetatable(Vector3.new())
+local oldIndex = mt.__index
+
+local safeCaller = newcclosure(LPH_NO_VIRTUALIZE(function(self, key)
+    if key == "Magnitude" and typeof(self) == "Vector3" then
+        local trace = debug.traceback()
+        if not (trace:find("react") or trace:find("gkReact") or trace:find("catch")) then
+            return oldIndex(self, key)
+        end
+        local origMagnitude = oldIndex(self, key)
+        local limit = 5
+        return math.min(origMagnitude, limit)
+    end
+    return oldIndex(self, key)
+end))
+
+setreadonly(mt, false)
+local original = mt["__index"]
+
+mt["__index"] = newcclosure(function(...)
+    if debug.info(2, "s") ~= "[C]" and debug.info(3, "s") ~= "[C]" then
+        return original(...)
+    end
+    return safeCaller(...)
+end)
+
+setreadonly(mt, true)
+
+local old_invoke
+old_invoke = hookfunction(Instance.new("RemoteFunction").InvokeServer, function(self, ...)
+    if game.PlaceId == 132985434722615 then
+        return old_invoke(self, ...)
+    end
+
+    local args = { ... }
+
+    local success, result = pcall(function()
+        if type(args[3]) == "table" then
+            local t = {}
+            for k, v in pairs(args[3]) do
+                if k ~= "forceNetworkOwner" then
+                    t[k] = v
+                end
+            end
+            t.ignoreReactDecline = true
+            t.specialTool = true
+
+            args[3] = t
+        end
+
+        return old_invoke(self, unpack(args))
+    end)
+
+    if success then
+        return result
+    end
+end)
+
+local old_fire
+old_fire = hookfunction(Instance.new("RemoteEvent").FireServer, function(self, ...)
+    if game.PlaceId == 132985434722615 then
+        return old_fire(self, ...)
+    end
+
+    local args = { ... }
+
+    pcall(function()
+        if type(args[3]) == "table" then
+            local t = {}
+            for k, v in pairs(args[3]) do
+                if k ~= "forceNetworkOwner" then
+                    t[k] = v
+                end
+            end
+            t.ignoreReactDecline = true
+            t.specialTool = true
+
+            args[3] = t
+        end
+    end)
+
+    return old_fire(self, unpack(args))
+end)
+
+local ankleModule, originalAnkle
+for _, tbl in ipairs(getgc(true)) do
+    if type(tbl) == "table" and typeof(rawget(tbl, "ankle")) == "function" then
+        ankleModule = tbl
+        originalAnkle = tbl.ankle
+
+        tbl.ankle = function(...)
+            if _G.Opts and _G.Opts.anti_ankle then
+                return
+            end
+            return originalAnkle(...)
+        end
+        break
+    end
+end
+
+local function GetHandshake()
+    return {
+        ["key1"] = tick(),
+        ["key2"] = Players.LocalPlayer.UserId,
+        ["key3"] = os.clock()
+    }
+end
+
+local Net = {
+    Send = function(Self, ...)
+        return getrenv()._G._references.RemoteEvent:FireServer(GetHandshake(), ...)
+    end,
+
+    Fetch = function(Self, ...)
+        return getrenv()._G._references.RemoteFunction:InvokeServer(GetHandshake(), ...)
+    end
 }
 
-local currentPlaceId = game.PlaceId
+_G.Opts = _G.Opts or {}
+_G.Opts.reach = _G.Opts.reach or false
+_G.Opts.comp_reach = _G.Opts.comp_reach or false
+_G.Opts.reach_x = _G.Opts.reach_x or 7.5
+_G.Opts.reach_y = _G.Opts.reach_y or 7.5
+_G.Opts.reach_z = _G.Opts.reach_z or 7.5
+_G.Opts.offset_x = _G.Opts.offset_x or 0
+_G.Opts.offset_y = _G.Opts.offset_y or 0
+_G.Opts.offset_z = _G.Opts.offset_z or 0
+_G.Opts.inf_stamina = _G.Opts.inf_stamina or false
+_G.Opts.anti_ankle = _G.Opts.anti_ankle or false
+_G.Opts.reach_visualizer_enabled = _G.Opts.reach_visualizer_enabled or false
+_G.Opts.box_transparency = _G.Opts.box_transparency or 0.5
+_G.Opts.auto_goal_target = _G.Opts.auto_goal_target or "Enemy"
+_G.Opts.visualizer_material = _G.Opts.visualizer_material or "ForceField"
+_G.Opts.ball_predictor = _G.Opts.ball_predictor or false
+_G.Opts.ball_predict_color = _G.Opts.ball_predict_color or Color3.fromRGB(100, 180, 255)
 
-local function notify(title, message, duration)
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title;
-        Text = message;
-        Duration = duration or 5;
-    })
+local cBalls = {}
+
+for _, v in pairs(CollectionService:GetTagged("Ball")) do
+    if v and v:IsA("BasePart") then
+        table.insert(cBalls, v)
+    end
 end
 
-notify("Game Detector", "Detecting game...", 3)
+CollectionService:GetInstanceAddedSignal("Ball"):Connect(function(o)
+    if o and o:IsA("BasePart") then
+        table.insert(cBalls, o)
+    end
+end)
 
-wait(1)
+CollectionService:GetInstanceRemovedSignal("Ball"):Connect(function(o)
+    local i = table.find(cBalls, o)
+    if i then
+        table.remove(cBalls, i)
+    end
+end)
 
-local function loadRFL()
-    notify("Game Detected", "RFL/RF24 - Loading Cobalt Hub...", 3)
-    wait(0.5)
+local function getClosestBall()
+    if #cBalls == 0 then
+        return nil
+    end
 
-    repeat task.wait() until game:IsLoaded()
+    local character = LocalPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
 
-    local gmt = getrawmetatable(game)
-    local setreadonly = setreadonly or make_writeable or function() end
-    local getnamecallmethod = getnamecallmethod or get_namecall_method
-    local newcclosure = newcclosure or function(f) return f end
+    if not hrp then
+        return cBalls[1]
+    end
 
-    pcall(function()
-        setreadonly(gmt, false)
-        local blocked = {"Kick", "Ban"}
-        local old = gmt.__namecall
-        gmt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if table.find(blocked, method) then return end
-            if method == "FireServer" or method == "InvokeServer" then
-                local name = tostring(self):lower()
-                if name:match("anti") or name:match("detect") or name:match("flag") then return end
+    local closestBall, closestDistance = nil, math.huge
+
+    for _, ball in pairs(cBalls) do
+        if ball and ball.Parent then
+            local distance = (ball.Position - hrp.Position).Magnitude
+            if distance < closestDistance then
+                closestDistance, closestBall = distance, ball
             end
-            return old(self, ...)
-        end)
-        setreadonly(gmt, true)
-    end)
+        end
+    end
 
+    return closestBall or cBalls[1]
+end
+
+local function getTeamSide()
+    local team = LocalPlayer.Team
+    if not team then return "Home" end
+
+    local first = string.split(team.Name, " ")[1]
+    if first == "Home" or first == "Away" then
+        return first
+    end
+    return "Home"
+end
+
+local function getNet(targetEnemy)
+    for _, object in ipairs(Workspace:GetChildren()) do
+        if object.Name == "pitch" and object:FindFirstChild("nets") then
+            local nets = object.nets
+            local mySide = getTeamSide()
+            local targetSide
+            
+            if targetEnemy then
+                targetSide = (mySide == "Home") and "Away" or "Home"
+            else
+                targetSide = mySide
+            end
+            
+            if nets:FindFirstChild(targetSide) then
+                return nets[targetSide]
+            end
+        end
+    end
+end
+
+local function scoreBall()
+    local targetEnemy = (_G.Opts.auto_goal_target == "Enemy")
+    local net = getNet(targetEnemy)
+    
+    if not net or not net:FindFirstChild("Collide") then
+        return
+    end
+    
+    local collide = net.Collide
+    local ball = getClosestBall()
+    
+    if ball and ball.Parent then
+        pcall(function() 
+            ball:SetNetworkOwner(LocalPlayer) 
+        end)
+        
+        task.wait(0.05)
+        
+        ball.CFrame = collide.CFrame
+        ball.AssemblyLinearVelocity = Vector3.zero
+        ball.AssemblyAngularVelocity = Vector3.zero
+        
+        ball.Velocity = Vector3.zero
+        ball.RotVelocity = Vector3.zero
+    end
+end
+
+local reachConn
+local visualizerPart = nil
+
+local function updateVis()
+    if visualizerPart and visualizerPart.Parent then
+        visualizerPart.Size = Vector3.new(_G.Opts.reach_x, _G.Opts.reach_y, _G.Opts.reach_z)
+        visualizerPart.Transparency = _G.Opts.box_transparency
+        visualizerPart.Material = Enum.Material[_G.Opts.visualizer_material] or Enum.Material.ForceField
+        local weld = visualizerPart:FindFirstChild("Weld")
+        if weld then
+            weld.C0 = CFrame.new(_G.Opts.offset_x, _G.Opts.offset_y, _G.Opts.offset_z)
+        end
+    end
+end
+
+local function createVisualizer()
+    if visualizerPart then
+        if visualizerPart.Parent then
+            visualizerPart:Destroy()
+        end
+        visualizerPart = nil
+    end
+
+    local old = Workspace:FindFirstChild("ReachVisualizer")
+    if old then
+        old:Destroy()
+    end
+
+    local character = LocalPlayer.Character
+    if not character then
+        warn("No character found for visualizer")
+        return
+    end
+
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        warn("No HumanoidRootPart found for visualizer")
+        return
+    end
+
+    visualizerPart = Instance.new("Part")
+    visualizerPart.Name = "ReachVisualizer"
+    visualizerPart.Anchored = false
+    visualizerPart.CanCollide = false
+    visualizerPart.CanTouch = false
+    visualizerPart.Massless = true
+    visualizerPart.CastShadow = false
+    visualizerPart.Material = Enum.Material.ForceField
+    visualizerPart.Color = Color3.fromRGB(0, 255, 255)
+    visualizerPart.Parent = Workspace
+
+    local weld = Instance.new("Weld")
+    weld.Name = "Weld"
+    weld.Part0 = hrp
+    weld.Part1 = visualizerPart
+    weld.C0 = CFrame.new(_G.Opts.offset_x, _G.Opts.offset_y, _G.Opts.offset_z)
+    weld.Parent = visualizerPart
+
+    updateVis()
+    print("Reach visualizer created successfully")
+end
+
+local function destroyVisualizer()
+    if visualizerPart then
+        visualizerPart:Destroy()
+        visualizerPart = nil
+    end
+end
+
+if _G.Opts.reach then
+    reachConn = RunService.RenderStepped:Connect(function()
+        if not _G.Opts.reach then
+            return
+        end
+
+        local character = LocalPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        if not (hrp and #cBalls > 0) then
+            return
+        end
+
+        local boxCF = hrp.CFrame * CFrame.new(_G.Opts.offset_x, _G.Opts.offset_y, _G.Opts.offset_z)
+        local boxSize = Vector3.new(_G.Opts.reach_x, _G.Opts.reach_y, _G.Opts.reach_z)
+
+        local params = OverlapParams.new()
+        params.FilterType = Enum.RaycastFilterType.Whitelist
+        params.FilterDescendantsInstances = cBalls
+
+        local hits = Workspace:GetPartBoundsInBox(boxCF, boxSize, params)
+        if #hits == 0 then
+            return
+        end
+
+        table.sort(hits, function(a, b)
+            return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+        end)
+
+        local ball = hits[1]
+        local allowed = (not _G.Opts.comp_reach) or (ball:GetAttribute("networkOwner") ~= LocalPlayer.UserId)
+        if not allowed then
+            return
+        end
+
+        for _, limbName in pairs({ "Head", "Torso", "Collide", "LeftHand", "RightHand" }) do
+            local limb = character:FindFirstChild(limbName)
+            if limb then
+                firetouchinterest(limb, ball, 0)
+                firetouchinterest(limb, ball, 1)
+            end
+        end
+    end)
+end
+
+if _G.Opts.reach_visualizer_enabled then
     task.wait(0.5)
+    createVisualizer()
+end
 
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
-    local Workspace = game:GetService("Workspace")
-    local HttpService = game:GetService("HttpService")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local CollectionService = game:GetService("CollectionService")
-    local player = Players.LocalPlayer
+local infStamConn
 
-    local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-
-    local Window = Fluent:CreateWindow({
-        Title = "Cobalt Hub - RFL/RF24",
-        SubTitle = "by rapidkuba",
-        TabWidth = 160,
-        Size = UDim2.fromOffset(580, 460),
-        Acrylic = true,
-        Theme = "Dark"
-    })
-
-    local Tabs = {
-        Main = Window:AddTab({ Title = "Main", Icon = "" }),
-        Ball = Window:AddTab({ Title = "Ball", Icon = "" }),
-        Game = Window:AddTab({ Title = "Game", Icon = "" }),
-        Settings = Window:AddTab({ Title = "Settings", Icon = "" })
-    }
-
-    local config = {
-        visOn = false,
-        reachX = 7.5,
-        reachY = 7.5,
-        reachZ = 7.5,
-        offsetX = 0,
-        offsetY = 0,
-        offsetZ = 0,
-        infStamOn = false,
-        antiOutOn = false,
-        ballPredictOn = false,
-        autoGoal = false,
-        ballPredictColor = Color3.fromRGB(100, 180, 255)
-    }
-
-    pcall(function()
-        for _, v in ipairs(getgc(true)) do
-            if type(v) == "table" and rawget(v, "gkCheck") then
-                pcall(function()
-                    for index, constant in debug.getconstants(v.react) do
-                        if constant == "ignoreReactDecline" then
-                            debug.setconstant(v.react, index, "ball")
-                        end
-                        if constant == "specialTool" then
-                            debug.setconstant(v.react, index, "ball")
-                        end
-                    end
-                end)
-                
-                pcall(function()
-                    rawset(v, "overlapCheck", function() return true end)
-                end)
-                
-                pcall(function()
-                    rawset(v, "check", function() return true end)
-                end)
-                break
-            end
+if _G.Opts.inf_stamina then
+    infStamConn = RunService.RenderStepped:Connect(function()
+        if not _G.Opts.inf_stamina then
+            return
         end
-    end)
 
-    local cBalls = {}
-
-    local function addBall(object)
-        if object:IsA("BasePart") then
-            table.insert(cBalls, object)
-        end
-    end
-
-    for _, object in pairs(CollectionService:GetTagged("Ball")) do
-        addBall(object)
-    end
-
-    CollectionService:GetInstanceAddedSignal("Ball"):Connect(addBall)
-    CollectionService:GetInstanceRemovedSignal("Ball"):Connect(function(object)
-        if table.find(cBalls, object) then
-            table.remove(cBalls, table.find(cBalls, object))
-        end
-    end)
-
-    local function getBalls()
-        local balls = {}
         pcall(function()
-            for _, obj in ipairs(Workspace.game:GetDescendants()) do
-                if obj:IsA("BasePart") and (obj:GetAttribute("networkOwner") or obj:GetAttribute("lastTouch") or obj.Name:lower():find("ball")) then
-                    table.insert(balls, obj)
-                end
+            local ps = LocalPlayer and LocalPlayer:FindFirstChild("PlayerScripts")
+            local controllers = ps and ps:FindFirstChild("controllers")
+            local move = controllers and controllers:FindFirstChild("movementController")
+            local stam = move and move:FindFirstChild("stamina")
+            if stam then
+                stam.Value = 100
             end
         end)
-        if #balls == 0 then
-            for _, obj in ipairs(cBalls) do
-                if obj and obj.Parent then
-                    table.insert(balls, obj)
-                end
-            end
-        end
-        return balls
-    end
-
-    Tabs.Main:AddToggle("VisualizerToggle", {
-        Title = "Visualizer",
-        Default = false,
-        Callback = function(val)
-            config.visOn = val
-        end
-    })
-
-    Tabs.Main:AddSlider("ReachXSlider", {
-        Title = "Reach X",
-        Description = "horizontal reach size",
-        Default = 7.5,
-        Min = 1,
-        Max = 12.5,
-        Rounding = 1,
-        Callback = function(val)
-            config.reachX = val
-        end
-    })
-
-    Tabs.Main:AddSlider("ReachYSlider", {
-        Title = "Reach Y",
-        Description = "vertical reach size",
-        Default = 7.5,
-        Min = 1,
-        Max = 12.5,
-        Rounding = 1,
-        Callback = function(val)
-            config.reachY = val
-        end
-    })
-
-    Tabs.Main:AddSlider("ReachZSlider", {
-        Title = "Reach Z",
-        Description = "depth reach size",
-        Default = 7.5,
-        Min = 1,
-        Max = 12.5,
-        Rounding = 1,
-        Callback = function(val)
-            config.reachZ = val
-        end
-    })
-
-    Tabs.Main:AddSlider("OffsetXSlider", {
-        Title = "Offset X",
-        Description = "horizontal offset",
-        Default = 0,
-        Min = -50,
-        Max = 50,
-        Rounding = 0,
-        Callback = function(val)
-            config.offsetX = val
-        end
-    })
-
-    Tabs.Main:AddSlider("OffsetYSlider", {
-        Title = "Offset Y",
-        Description = "vertical offset",
-        Default = 0,
-        Min = -50,
-        Max = 50,
-        Rounding = 0,
-        Callback = function(val)
-            config.offsetY = val
-        end
-    })
-
-    Tabs.Main:AddSlider("OffsetZSlider", {
-        Title = "Offset Z",
-        Description = "depth offset",
-        Default = 0,
-        Min = -50,
-        Max = 50,
-        Rounding = 0,
-        Callback = function(val)
-            config.offsetZ = val
-        end
-    })
-
-    Tabs.Main:AddToggle("InfStaminaToggle", {
-        Title = "Infinite Stamina",
-        Default = false,
-        Callback = function(val)
-            config.infStamOn = val
-        end
-    })
-
-    Tabs.Ball:AddToggle("BallPredictToggle", {
-        Title = "Ball Predictor",
-        Description = "shows ball trajectory",
-        Default = false,
-        Callback = function(val)
-            config.ballPredictOn = val
-        end
-    })
-
-    Tabs.Ball:AddToggle("AutoGoalToggle", {
-        Title = "Auto Goal",
-        Description = "automatically scores goals",
-        Default = false,
-        Callback = function(val)
-            config.autoGoal = val
-            Fluent:Notify({
-                Title = "Auto Goal",
-                Content = (val and "Enabled" or "Disabled"),
-                Duration = 2
-            })
-        end
-    })
-
-    Tabs.Game:AddToggle("AntiOutToggle", {
-        Title = "Anti-Out",
-        Description = "prevents out of bounds",
-        Default = false,
-        Callback = function(val)
-            config.antiOutOn = val
-        end
-    })
-
-    Tabs.Game:AddButton({
-        Title = "Match Settings",
-        Description = "open match settings",
-        Callback = function()
-            pcall(function()
-                player:WaitForChild("PlayerScripts"):WaitForChild("visuals"):WaitForChild("matchSettings"):SetAttribute("toggle", true)
-            end)
-            Fluent:Notify({
-                Title = "Match Settings",
-                Content = "Toggled!",
-                Duration = 2
-            })
-        end
-    })
-
-    Tabs.Game:AddButton({
-        Title = "Pitch Teleport",
-        Description = "teleport to pitch",
-        Callback = function()
-            pcall(function()
-                local net = ReplicatedStorage:FindFirstChild("network")
-                if net and net:FindFirstChild("Shared") then
-                    for _, re in pairs(net.Shared:GetChildren()) do
-                        if re:IsA("RemoteEvent") then 
-                            re:FireServer(1000, "pitchTeleporter") 
-                            Fluent:Notify({
-                                Title = "Teleport",
-                                Content = "Teleported to pitch!",
-                                Duration = 2
-                            })
-                            break 
-                        end
-                    end
-                end
-            end)
-        end
-    })
-
-    Tabs.Settings:AddButton({
-        Title = "Rejoin Server",
-        Description = "rejoins current server",
-        Callback = function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-        end
-    })
-
-    Tabs.Settings:AddButton({
-        Title = "Server Hop",
-        Description = "joins a different server",
-        Callback = function()
-            pcall(function()
-                local servers = {}
-                local req = HttpService:JSONDecode(game:HttpGetAsync("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
-                if req and req.data then
-                    for _, srv in pairs(req.data) do
-                        if srv.id ~= game.JobId and srv.playing < srv.maxPlayers then
-                            table.insert(servers, srv.id)
-                        end
-                    end
-                end
-                if #servers > 0 then
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1,#servers)], player)
-                end
-            end)
-        end
-    })
-
-    Tabs.Settings:AddParagraph({
-        Title = "Discord",
-        Content = "Join our discord server for updates and support"
-    })
-
-    Tabs.Settings:AddButton({
-        Title = "Copy Discord",
-        Description = "copies discord invite",
-        Callback = function()
-            setclipboard("https://discord.gg/4RR8WXwdAx")
-            Fluent:Notify({
-                Title = "Copied!",
-                Content = "Discord invite copied to clipboard",
-                Duration = 3
-            })
-        end
-    })
-
-    local char = player.Character or player.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-
-    player.CharacterAdded:Connect(function(c)
-        char = c
-        hrp = c:WaitForChild("HumanoidRootPart")
     end)
+end
 
-    local hitbox = Instance.new("Part")
-    hitbox.Name = "ReachBox"
-    hitbox.Anchored = true
-    hitbox.CanCollide = false
-    hitbox.Transparency = 1
-    hitbox.Parent = Workspace
+local aimingEnabled = false
+local moveSpeed = 200
+local cornerPositions = {}
+local selectedTargetCFrame = nil
+local currentSelectionName = "Top Left"
+local activeBallTracking = {}
 
-    local box = Instance.new("SelectionBox")
-    box.Adornee = hitbox
-    box.LineThickness = 0.05
-    box.Color3 = Color3.fromRGB(70, 130, 180)
-    box.Transparency = 1
-    box.Parent = hitbox
+local function getAimTeam()
+    if not LocalPlayer.Team then return "Home" end
+    local team = string.split(LocalPlayer.Team.Name, " ")[1]
+    return (team == "Home" and "Away") or "Home"
+end
 
-    local particles = Instance.new("ParticleEmitter")
-    particles.Texture = "rbxassetid://243660364"
-    particles.Lifetime = NumberRange.new(0.4)
-    particles.Rate = 40
-    particles.Speed = NumberRange.new(2)
-    particles.Color = ColorSequence.new(Color3.fromRGB(70, 130, 180))
-    particles.Transparency = NumberSequence.new(0.4, 1)
-    particles.LightEmission = 1
-    particles.Enabled = false
-    particles.Parent = hitbox
-
-    local outstore = {}
-
-    local function getTeam()
-        if not player.Team then return "Home" end
-        local team = string.split(player.Team.Name, " ")[1]
-        return team == "Home" and "Away" or "Home"
-    end
-
-    local function getGoal()
-        for _, object in pairs(Workspace.game:GetChildren()) do
-            if object.Name == "system" and object:FindFirstChild("goal") then
-                return object.goal[getTeam()]
+local function getAimGoal()
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj.Name == "pitch" and obj:FindFirstChild("nets") then
+            local nets = obj.nets
+            local side = getAimTeam()
+            if nets:FindFirstChild(side) then
+                return nets[side]
             end
         end
     end
+end
 
-    local activeBallTracking = {}
-
-    local function getTB(ball)
-        local goal = getGoal()
-        if not goal then return ball.Position + Vector3.new(0, 10, 0) end
-        
-        local goalCenter = goal.Position
-        local targetY = goalCenter.Y + (goal.Size.Y / 3)
-        local sideOffset = (goal.Size.X / 3)
-        local leftOrRight = math.random() > 0.5 and 1 or -1
-        local lateralOffset = goal.CFrame.RightVector * (sideOffset * leftOrRight)
-        
-        local targetPos = Vector3.new(
-            goalCenter.X + lateralOffset.X,
-            targetY,
-            goalCenter.Z + lateralOffset.Z
-        )
-        
-        return targetPos
+local function updateCornerPositions()
+    local goal = getAimGoal()
+    if not goal or not goal:IsA("BasePart") then
+        return
     end
 
-    local function getAGVector(ball, targetPos)
-        local ballPos = ball.Position
-        local direction = (targetPos - ballPos).Unit
-        local speed = 350
-        return direction * speed
-    end
+    local goalSize = goal.Size
+    local goalCFrame = goal.CFrame
 
+    local halfWidth = goalSize.X / 2.2
+    local halfHeight = goalSize.Y / 2.2
+
+    cornerPositions["Top Left"] = goalCFrame * CFrame.new(-halfWidth, halfHeight, 0)
+    cornerPositions["Top Right"] = goalCFrame * CFrame.new(halfWidth, halfHeight, 0)
+    cornerPositions["Bottom Left"] = goalCFrame * CFrame.new(-halfWidth, -halfHeight, 0)
+    cornerPositions["Bottom Right"] = goalCFrame * CFrame.new(halfWidth, -halfHeight, 0)
+
+    selectedTargetCFrame = cornerPositions[currentSelectionName]
+end
+
+local function getTB(ball)
+    if not selectedTargetCFrame then
+        updateCornerPositions()
+    end
+    
+    local goal = getAimGoal()
+    if not goal then return ball.Position + Vector3.new(0, 10, 0) end
+    
+    if selectedTargetCFrame then
+        return selectedTargetCFrame.Position
+    end
+    
+    local goalCenter = goal.Position
+    local targetY = goalCenter.Y + (goal.Size.Y / 3)
+    local sideOffset = (goal.Size.X / 3)
+    local leftOrRight = math.random() > 0.5 and 1 or -1
+    local lateralOffset = goal.CFrame.RightVector * (sideOffset * leftOrRight)
+    
+    local targetPos = Vector3.new(
+        goalCenter.X + lateralOffset.X,
+        targetY,
+        goalCenter.Z + lateralOffset.Z
+    )
+    
+    return targetPos
+end
+
+local function getAGVector(ball, targetPos)
+    local ballPos = ball.Position
+    local direction = (targetPos - ballPos).Unit
+    local speed = moveSpeed
+    return direction * speed
+end
+
+task.wait(2)
+updateCornerPositions()
+
+RunService.Heartbeat:Connect(function()
     pcall(function()
-        local ballsFolder = CollectionService:GetTagged("BallsFolder")[1]
-        if ballsFolder then
-            ballsFolder.DescendantAdded:Connect(function(bodyVel)
-                if not config.autoGoal then return end
-                if not bodyVel:IsA("BodyVelocity") then return end
-                if not bodyVel.Parent:IsA("BasePart") then return end
-                if activeBallTracking[bodyVel.Parent] then return end
-                
-                local hasKickTool = false
-                if char then
-                    for _, tool in pairs(char:GetChildren()) do
-                        if tool:IsA("Tool") and tool.Name:lower():find("kick") then
-                            hasKickTool = true
-                            break
-                        end
-                    end
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        if _G.Opts.ball_predictor and #cBalls > 0 then
+            for _, v in pairs(Workspace:GetChildren()) do
+                if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("RephonPred") then 
+                    v:Destroy() 
                 end
-                
-                if not hasKickTool then return end
-                
-                task.spawn(function()
-                    repeat task.wait() until bodyVel.Velocity ~= Vector3.new(0, 2, 0)
-                    
-                    local ball = bodyVel.Parent
-                    if not ball or not ball.Parent then return end
-                    
-                    activeBallTracking[ball] = true
-                    
-                    for i = 1, 3 do
-                        pcall(function() ball:SetNetworkOwner(player) end)
-                        task.wait(0.02)
-                    end
-                    
-                    task.wait(0.05)
-                    
-                    for _, object in pairs(ball:GetChildren()) do
-                        if object:IsA("BodyMover") then
-                            pcall(function() object:Destroy() end)
-                        end
-                    end
-                    
-                    task.wait(0.02)
-                    
-                    local targetPos = getTB(ball)
-                    
-                    local newBodyVel = Instance.new("BodyVelocity")
-                    newBodyVel.Name = "AutoGoalVelocity"
-                    newBodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    newBodyVel.Velocity = getAGVector(ball, targetPos)
-                    newBodyVel.P = 50000
-                    newBodyVel.Parent = ball
-                    
-                    local antiGrav = Instance.new("BodyForce")
-                    antiGrav.Name = "AutoGoalAntiGrav"
-                    antiGrav.Force = Vector3.new(0, ball:GetMass() * Workspace.Gravity * 1.1, 0)
-                    antiGrav.Parent = ball
-                    
-                    local startTime = tick()
-                    local maxDuration = 2.5
-                    local lastUpdate = tick()
-                    
-                    local connection
-                    connection = RunService.Heartbeat:Connect(function()
-                        if not ball or not ball.Parent or not newBodyVel or not newBodyVel.Parent then
-                            if connection then connection:Disconnect() end
-                            activeBallTracking[ball] = nil
-                            return
-                        end
-                        
-                        if tick() - startTime > maxDuration then
-                            if connection then connection:Disconnect() end
-                            if newBodyVel and newBodyVel.Parent then newBodyVel:Destroy() end
-                            if antiGrav and antiGrav.Parent then antiGrav:Destroy() end
-                            activeBallTracking[ball] = nil
-                            return
-                        end
-                        
-                        if tick() - lastUpdate > 0.1 then
-                            pcall(function()
-                                local distanceToGoal = (ball.Position - targetPos).Magnitude
-                                if distanceToGoal < 5 then
-                                    if connection then connection:Disconnect() end
-                                    if newBodyVel and newBodyVel.Parent then newBodyVel:Destroy() end
-                                    if antiGrav and antiGrav.Parent then antiGrav:Destroy() end
-                                    activeBallTracking[ball] = nil
-                                    return
-                                end
-                                newBodyVel.Velocity = getAGVector(ball, targetPos)
-                            end)
-                            lastUpdate = tick()
-                        end
-                    end)
-                    
-                    task.delay(maxDuration, function()
-                        if connection then connection:Disconnect() end
-                        if newBodyVel and newBodyVel.Parent then
-                            newBodyVel:Destroy()
-                        end
-                        if antiGrav and antiGrav.Parent then
-                            antiGrav:Destroy()
-                        end
-                        activeBallTracking[ball] = nil
-                    end)
-                end)
+            end
+
+            local balls = {}
+            for _, ball in pairs(cBalls) do
+                if ball and ball.Parent then
+                    table.insert(balls, ball)
+                end
+            end
+
+            if #balls == 0 then return end
+
+            table.sort(balls, function(a, b)
+                return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
             end)
-        end
-    end)
 
-    RunService.Heartbeat:Connect(function()
-        pcall(function()
-            if not char or not char.Parent then
-                char = player.Character
-            end
-            if not char then return end
-            
-            if not hrp or not hrp.Parent then
-                hrp = char:FindFirstChild("HumanoidRootPart")
-            end
-            if not hrp then return end
-            
-            local balls = getBalls()
+            local ball = balls[1]
+            if not ball or ball.AssemblyLinearVelocity.Magnitude < 5 then return end
 
-            if config.visOn and #balls > 0 then
-                hitbox.CFrame = hrp.CFrame * CFrame.new(config.offsetX, config.offsetY, config.offsetZ)
-                hitbox.Size = Vector3.new(config.reachX, config.reachY, config.reachZ)
-                box.Transparency = 0.6
-                particles.Enabled = true
-            else
-                box.Transparency = 1
-                particles.Enabled = false
-            end
+            local pos = ball.Position
+            local vel = ball.AssemblyLinearVelocity
+            local grav = Workspace.Gravity
+            local ground = hrp.Position.Y - 2
+            local points = {}
 
-            if config.infStamOn then
-                pcall(function()
-                    local ps = player:FindFirstChild("PlayerScripts")
-                    if ps then
-                        local c = ps:FindFirstChild("controllers")
-                        if c then
-                            local m = c:FindFirstChild("movementController")
-                            if m and m:FindFirstChild("stamina") then
-                                m.stamina.Value = 100
-                            end
-                        end
-                    end
-                end)
-            end
-
-            if config.antiOutOn then
-                local out = Workspace:FindFirstChild("game") and Workspace.game:FindFirstChild("system") and Workspace.game.system:FindFirstChild("out")
-                if out then
-                    for _, part in ipairs(out:GetChildren()) do
-                        if table.find({"AwayLeft","AwayRight","HomeLeft","HomeRight","ThrowInFarSide","ThrowInTunnelSide"}, part.Name) then
-                            if not outstore[part.Name] then
-                                outstore[part.Name] = part.Parent
-                                part.Parent = nil
-                            end
-                        end
-                    end
+            for i = 1, 25 do
+                local t = i * 0.1
+                local futurePos = pos + (vel * t) + Vector3.new(0, -0.5 * grav * t * t, 0)
+                if futurePos.Y <= ground then
+                    table.insert(points, Vector3.new(futurePos.X, ground, futurePos.Z))
+                    break
+                else
+                    table.insert(points, futurePos)
                 end
-            else
-                for name, parent in pairs(outstore) do
-                    local out = Workspace:FindFirstChild("game") and Workspace.game:FindFirstChild("system") and Workspace.game.system:FindFirstChild("out")
-                    if out then
-                        local part = out:FindFirstChild(name)
-                        if part then part.Parent = parent end
-                    end
-                end
-                outstore = {}
             end
 
-            if config.ballPredictOn and #balls > 0 then
-                task.spawn(function()
-                    pcall(function()
-                        for _, v in pairs(Workspace:GetChildren()) do
-                            if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then v:Destroy() end
-                        end
+            if #points < 2 then return end
 
-                        table.sort(balls, function(a, b)
-                            return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
-                        end)
+            for i = 1, #points - 1 do
+                local att0 = Instance.new("Attachment")
+                att0.Name = "RephonPredAttach"
+                att0.WorldPosition = points[i]
+                att0.Parent = Workspace.Terrain
 
-                        local ball = balls[1]
-                        if not ball or ball.AssemblyLinearVelocity.Magnitude < 5 then return end
+                local att1 = Instance.new("Attachment")
+                att1.Name = "RephonPredAttach"
+                att1.WorldPosition = points[i + 1]
+                att1.Parent = Workspace.Terrain
 
-                        local pos = ball.Position
-                        local vel = ball.AssemblyLinearVelocity
-                        local grav = Workspace.Gravity
-                        local ground = hrp.Position.Y - 2
-                        local points = {}
+                local beam = Instance.new("Beam")
+                beam.Name = "RephonPred"
+                beam.Attachment0 = att0
+                beam.Attachment1 = att1
+                beam.Color = ColorSequence.new(_G.Opts.ball_predict_color)
+                beam.Width0 = 0.3
+                beam.Width1 = 0.3
+                beam.FaceCamera = true
+                beam.Transparency = NumberSequence.new(0.3)
+                beam.Parent = Workspace
+            end
 
-                        for i = 1, 25 do
-                            local t = i * 0.1
-                            local futurePos = pos + (vel * t) + Vector3.new(0, -0.5 * grav * t * t, 0)
-                            if futurePos.Y <= ground then
-                                table.insert(points, Vector3.new(futurePos.X, ground, futurePos.Z))
-                                break
-                            else
-                                table.insert(points, futurePos)
-                            end
-                        end
-
-                        if #points < 2 then return end
-
-                        for i = 1, #points - 1 do
-                            local att0 = Instance.new("Attachment")
-                            att0.Name = "CobaltPredAttach"
-                            att0.WorldPosition = points[i]
-                            att0.Parent = Workspace.Terrain
-
-                            local att1 = Instance.new("Attachment")
-                            att1.Name = "CobaltPredAttach"
-                            att1.WorldPosition = points[i + 1]
-                            att1.Parent = Workspace.Terrain
-
-                            local beam = Instance.new("Beam")
-                            beam.Name = "CobaltPred"
-                            beam.Attachment0 = att0
-                            beam.Attachment1 = att1
-                            beam.Color = ColorSequence.new(config.ballPredictColor)
-                            beam.Width0 = 0.3
-                            beam.Width1 = 0.3
-                            beam.FaceCamera = true
-                            beam.Transparency = NumberSequence.new(0.3)
-                            beam.Parent = Workspace
-                        end
-
-                        task.delay(2, function()
-                            for _, v in pairs(Workspace:GetChildren()) do
-                                if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then v:Destroy() end
-                            end
-                        end)
-                    end)
-                end)
-            else
+            task.delay(2, function()
                 for _, v in pairs(Workspace:GetChildren()) do
-                    if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("CobaltPred") then v:Destroy() end
+                    if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("RephonPred") then 
+                        v:Destroy() 
+                    end
+                end
+            end)
+        else
+            for _, v in pairs(Workspace:GetChildren()) do
+                if (v:IsA("Beam") or v:IsA("Attachment")) and v.Name:match("RephonPred") then 
+                    v:Destroy() 
                 end
             end
-        end)
+        end
     end)
+end)
 
-    notify("✓ Loaded", "Cobalt Hub RFL/RF24 loaded successfully!", 3)
-    print("Cobalt Hub RFL/RF24 loaded successfully!")
-end
+local Library = loadstring(game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
 
-if currentPlaceId == GAMES.RFL or currentPlaceId == GAMES.RF24 then
-    loadRFL()
-else
-    notify("Unsupported Game", "This game is not supported!\nPlaceID: " .. tostring(currentPlaceId), 10)
-    warn("Unsupported game detected. Current PlaceId:", currentPlaceId)
-    warn("Supported games:")
-    for name, id in pairs(GAMES) do
-        warn(string.format("  - %s: %d", name, id))
+local Window = Library:CreateWindow{
+    Title = "Rephon Hub",
+    SubTitle = "",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Resize = true,
+    MinSize = Vector2.new(400, 350),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.RightControl
+}
+
+local Tabs = {
+    Reach = Window:CreateTab{ Title = "Reach", Icon = "crosshair" },
+    Player = Window:CreateTab{ Title = "Player", Icon = "user" },
+    Ball = Window:CreateTab{ Title = "Ball", Icon = "circle" },
+    Settings = Window:CreateTab{ Title = "Settings", Icon = "settings" }
+}
+
+Tabs.Reach:CreateToggle("EnableReach", {
+    Title = "Enable Reach",
+    Default = _G.Opts.reach,
+    Callback = function(Value)
+        _G.Opts.reach = Value
+
+        if Value and not reachConn then
+            reachConn = RunService.RenderStepped:Connect(function()
+                if not _G.Opts.reach then return end
+
+                local character = LocalPlayer.Character
+                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                if not (hrp and #cBalls > 0) then return end
+
+                local boxCF = hrp.CFrame * CFrame.new(_G.Opts.offset_x, _G.Opts.offset_y, _G.Opts.offset_z)
+                local boxSize = Vector3.new(_G.Opts.reach_x, _G.Opts.reach_y, _G.Opts.reach_z)
+
+                local params = OverlapParams.new()
+                params.FilterType = Enum.RaycastFilterType.Whitelist
+                params.FilterDescendantsInstances = cBalls
+
+                local hits = Workspace:GetPartBoundsInBox(boxCF, boxSize, params)
+                if #hits == 0 then return end
+
+                table.sort(hits, function(a, b)
+                    return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+                end)
+
+                local ball = hits[1]
+                local allowed = (not _G.Opts.comp_reach) or (ball:GetAttribute("networkOwner") ~= LocalPlayer.UserId)
+                if not allowed then
+                    return
+                end
+
+                for _, limbName in pairs({ "Head", "Torso", "Collide", "LeftHand", "RightHand" }) do
+                    local limb = character:FindFirstChild(limbName)
+                    if limb then
+                        firetouchinterest(limb, ball, 0)
+                        firetouchinterest(limb, ball, 1)
+                    end
+                end
+            end)
+        elseif not Value and reachConn then
+            reachConn:Disconnect()
+            reachConn = nil
+        end
     end
-end
+})
+
+Tabs.Reach:CreateToggle("CompReach", {
+    Title = "Comp Reach",
+    Default = _G.Opts.comp_reach,
+    Callback = function(Value)
+        _G.Opts.comp_reach = Value
+    end
+})
+
+Tabs.Reach:CreateSlider("ReachX", {
+    Title = "Reach X",
+    Default = _G.Opts.reach_x,
+    Min = 0,
+    Max = 7.5,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.reach_x = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateSlider("ReachY", {
+    Title = "Reach Y",
+    Default = _G.Opts.reach_y,
+    Min = 0,
+    Max = 7.5,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.reach_y = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateSlider("ReachZ", {
+    Title = "Reach Z",
+    Default = _G.Opts.reach_z,
+    Min = 0,
+    Max = 7.5,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.reach_z = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateSlider("OffsetX", {
+    Title = "Offset X",
+    Default = _G.Opts.offset_x,
+    Min = -10,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.offset_x = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateSlider("OffsetY", {
+    Title = "Offset Y",
+    Default = _G.Opts.offset_y,
+    Min = -10,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.offset_y = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateSlider("OffsetZ", {
+    Title = "Offset Z",
+    Default = _G.Opts.offset_z,
+    Min = -10,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        _G.Opts.offset_z = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateToggle("EnableVisualizer", {
+    Title = "Reach Visualizer",
+    Default = _G.Opts.reach_visualizer_enabled,
+    Callback = function(Value)
+        _G.Opts.reach_visualizer_enabled = Value
+        if Value then
+            task.wait(0.1)
+            createVisualizer()
+        else
+            destroyVisualizer()
+        end
+    end
+})
+
+Tabs.Reach:CreateSlider("BoxTransparency", {
+    Title = "Visualizer Transparency",
+    Default = _G.Opts.box_transparency,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(Value)
+        _G.Opts.box_transparency = Value
+        updateVis()
+    end
+})
+
+Tabs.Reach:CreateDropdown("VisualizerMaterial", {
+    Title = "Visualizer Material",
+    Values = { "ForceField", "Neon", "Glass", "Plastic", "Metal" },
+    Multi = false,
+    Default = "ForceField",
+    Callback = function(Value)
+        _G.Opts.visualizer_material = Value
+        updateVis()
+    end
+})
+
+Tabs.Player:CreateToggle("InfiniteStamina", {
+    Title = "Infinite Stamina",
+    Default = _G.Opts.inf_stamina,
+    Callback = function(Value)
+        _G.Opts.inf_stamina = Value
+
+        if Value and not infStamConn then
+            infStamConn = RunService.RenderStepped:Connect(function()
+                if not _G.Opts.inf_stamina then return end
+
+                pcall(function()
+                    local stam = LocalPlayer:FindFirstChild("PlayerScripts", true)
+                        :FindFirstChild("controllers", true)
+                        :FindFirstChild("movementController", true)
+                        :FindFirstChild("stamina", true)
+
+                    if stam then
+                        stam.Value = 100
+                    end
+                end)
+            end)
+        elseif not Value and infStamConn then
+            infStamConn:Disconnect()
+            infStamConn = nil
+        end
+    end
+})
+
+Tabs.Player:CreateToggle("AntiAnkle", {
+    Title = "Anti Ankle",
+    Default = _G.Opts.anti_ankle,
+    Callback = function(Value)
+        _G.Opts.anti_ankle = Value
+    end
+})
+
+Tabs.Ball:CreateToggle("BallPredictor", {
+    Title = "Ball Predictor",
+    Description = "Shows ball trajectory",
+    Default = _G.Opts.ball_predictor,
+    Callback = function(Value)
+        _G.Opts.ball_predictor = Value
+    end
+})
+
+Tabs.Ball:CreateDropdown("AutoGoalTarget", {
+    Title = "Auto Goal Target",
+    Values = {"Enemy", "Own"},
+    Multi = false,
+    Default = "Enemy",
+    Callback = function(Value)
+        _G.Opts.auto_goal_target = Value
+    end
+})
+
+Tabs.Ball:CreateButton{
+    Title = "Auto Goal",
+    Description = "Score in selected goal",
+    Callback = function()
+        scoreBall()
+    end
+}
+
+Tabs.Ball:CreateDropdown("CornerSelect", {
+    Title = "Select Corner",
+    Values = {"Top Left", "Top Right", "Bottom Left", "Bottom Right"},
+    Multi = false,
+    Default = "Top Left",
+    Callback = function(Value)
+        currentSelectionName = Value
+        updateCornerPositions()
+    end
+})
+
+local Themes = {
+    "Dark",
+    "Darker", 
+    "Light",
+    "Rose",
+    "Aqua",
+    "Amethyst"
+}
+
+Tabs.Settings:CreateDropdown("ThemeSelector", {
+    Title = "UI Theme",
+    Description = "Change the UI color theme",
+    Values = Themes,
+    Multi = false,
+    Default = "Dark",
+    Callback = function(Value)
+        Library:SetTheme(Value)
+    end
+})
+
+Tabs.Settings:CreateKeybind("MenuKeybind", {
+    Title = "UI Toggle Keybind",
+    Description = "Press to toggle the UI",
+    Default = "RightControl",
+    ChangedCallback = function(New)
+        print("Keybind changed to:", New)
+    end
+})
+
+Tabs.Settings:CreateToggle("ShowFPS", {
+    Title = "Show FPS Counter",
+    Description = "Displays your FPS",
+    Default = false,
+    Callback = function(Value)
+    end
+})
+
+Tabs.Settings:CreateButton{
+    Title = "Unload UI",
+    Description = "Removes the UI completely",
+    Callback = function()
+        Library:Destroy()
+    end
+}
+
+Window:SelectTab(1)
+
+Library:Notify{
+    Title = "Rephon Hub",
+    Content = "Successfully loaded",
+    Duration = 3
+}
