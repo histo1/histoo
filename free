@@ -1239,6 +1239,6 @@ Window:SelectTab(1)
 
 Library:Notify{
     Title = "Rephon Hub",
-    Content = "Successfully loaded with Vestro Logger!",
+    Content = "Successfully loaded with Rephon!",
     Duration = 3
 }
